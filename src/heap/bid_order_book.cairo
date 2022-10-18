@@ -103,10 +103,11 @@ func bob_bubble_up{
     return ();
 }
 
-// Delete order from buy order book (bob).
-// @param heap_len : Length of heap
-// @return root : Root value deleted from heap
-func bob_extract{
+// Delete root order from buy order book (bob).
+// @return root_price : Price of root order deleted from heap
+// @return root_dt : Datetime of root order deleted from heap
+// @return root_id : ID of root order deleted from heap
+func bob_extract_max{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
