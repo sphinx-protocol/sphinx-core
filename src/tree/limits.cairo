@@ -15,6 +15,7 @@ struct Limit {
     order_head : felt, 
     order_tail : felt,
     tree_id : felt,
+    market_id : felt,
 }
 
 // Stores details of limit prices as mapping.
@@ -29,7 +30,7 @@ func roots(tree_id : felt) -> (id : felt) {
 
 // Stores latest limit id.
 @storage_var
-func curr_id() -> (id : felt) {
+func curr_limit_id() -> (id : felt) {
 }
 
 @constructor
@@ -38,26 +39,28 @@ func constructor{
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
 } () {
-    curr_id.write(1);
+    curr_limit_id.write(1);
     return ();
 }
 
 // Insert new limit price into BST.
 // @param price : new limit price to be inserted
+// @param tree_id : ID of tree currently being traversed
+// @param tree_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
 func insert{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (price : felt, tree_id : felt) -> (success : felt) {
+} (price : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) {
     alloc_locals;
 
-    let (id) = curr_id.read();
+    let (id) = curr_limit_id.read();
     tempvar new_limit: Limit* = new Limit(
-        id=id, left_id=0, right_id=0, price=price, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=tree_id
+        id=id, left_id=0, right_id=0, price=price, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=tree_id, market_id=market_id
     );
     limits.write(id, [new_limit]);
-    curr_id.write(id + 1);
+    curr_limit_id.write(id + 1);
     
     let (root_id) = roots.read(tree_id);
     if (root_id == 0) {
@@ -67,29 +70,30 @@ func insert{
         let (new_root) = limits.read(new_limit.id);
         print_dfs_in_order(new_root, 1);
 
-        return (success=1);
+        return (new_limit=[new_limit]);
     }
     let (root) = limits.read(root_id);
-    let (success) = insert_helper(tree_id, price, root, new_limit.id);
+    let (inserted) = insert_helper(price, root, new_limit.id, tree_id, market_id);
 
     // Diagnostics
     let (new_root) = limits.read(root_id);
     print_dfs_in_order(new_root, 1);
 
-    return (success=success);
+    return (new_limit=inserted);
 }
 
 // Recursively finds correct position for new limit price in BST and inserts it. 
-// @param tree_id : ID of tree currently being traversed
 // @param price : new price to be inserted
 // @param curr : current node in traversal of the BST
-// @param new_limit : id of new node to be inserted into the BST
+// @param new_limit_id : id of new node to be inserted into the BST
+// @param tree_id : ID of tree currently being traversed
+// @param market_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
 func insert_helper{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (tree_id : felt, price : felt, curr : Limit, new_limit_id : felt) -> (success : felt) {
+} (price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) {
     alloc_locals;
     let (root_id) = roots.read(tree_id);
     let (root) = limits.read(root_id);
@@ -101,15 +105,15 @@ func insert_helper{
         if (curr.right_id == 0) {
             tempvar new_curr: Limit* = new Limit(
                 id=curr.id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
-                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id
+                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id, market_id=curr.market_id
             );
             limits.write(curr.id, [new_curr]);
             handle_revoked_refs();
-            return (success=1);
+            return (new_limit=[new_curr]);
         } else {
             let (curr_right) = limits.read(curr.right_id);
             handle_revoked_refs();
-            return insert_helper(tree_id, price, curr_right, new_limit_id);
+            return insert_helper(price, curr_right, new_limit_id, tree_id, market_id);
         }
     } else {
         handle_revoked_refs(); 
@@ -119,21 +123,24 @@ func insert_helper{
         if (curr.left_id == 0) {
             tempvar new_curr: Limit* = new Limit(
                 id=curr.id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
-                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id
+                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id, market_id=curr.market_id
             );
             limits.write(curr.id, [new_curr]);
             handle_revoked_refs();
-            return (success=1);
+            return (new_limit=[new_curr]);
         } else {
             let (curr_left) = limits.read(curr.left_id);
             handle_revoked_refs();
-            return insert_helper(tree_id, price, curr_left, new_limit_id);
+            return insert_helper(price, curr_left, new_limit_id, tree_id, market_id);
         }
     } else {
         handle_revoked_refs(); 
     }
 
-    return (success=0);
+    tempvar empty_limit: Limit* = new Limit(
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
+    );
+    return (new_limit=[empty_limit]);
 }
 
 // Find a limit price in binary search tree.
@@ -149,7 +156,7 @@ func find{
     let (root_id) = roots.read(tree_id);
     let (root) = limits.read(root_id);
     tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
     );
     if (root_id == 0) {
         return (limit=[empty_limit], parent=[empty_limit]);
@@ -173,7 +180,7 @@ func find_helper{
 
     if (curr.id == 0) {
         tempvar empty_limit: Limit* = new Limit(
-            id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0
+            id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
         );
         handle_revoked_refs();
         return (limit=[empty_limit], parent=[empty_limit]);
@@ -203,18 +210,19 @@ func find_helper{
 }
 
 // Deletes limit price from BST
-// @param tree_id : ID of tree currently being traversed
 // @param price : limit price to be deleted
+// @param tree_id : ID of tree currently being traversed
+// @param market_id : ID of current market
 // @return del : node representation of deleted limit price
 func delete{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (price : felt, tree_id : felt) -> (del : Limit) {
+} (price : felt, tree_id : felt, market_id : felt) -> (del : Limit) {
     alloc_locals;
 
     tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
     );
 
     let (root_id) = roots.read(tree_id);
@@ -269,8 +277,9 @@ func delete{
 }
 
 // Helper function to update left or right child of parent.
+// @param tree_id : ID of tree currently being traversed
 // @param parent : parent node to update
-// @param node : current node to be replaced
+// @param limit : current node to be replaced
 // @param new_id : id of the new node that parent should point to
 func update_parent{
     syscall_ptr: felt*,
@@ -306,7 +315,7 @@ func update_pointers{
 } (node : Limit, left_id : felt, right_id : felt) {
     tempvar new_node: Limit* = new Limit(
         id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
-        order_len=node.order_len, order_head=node.order_head, order_tail=node.order_tail, tree_id=node.tree_id
+        order_len=node.order_len, order_head=node.order_head, order_tail=node.order_tail, tree_id=node.tree_id, market_id=node.market_id
     );
     limits.write(node.id, [new_node]);
     handle_revoked_refs();
@@ -321,12 +330,12 @@ func find_min{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (root : Limit, parent : Limit) -> (min : Limit, parent : Limit) {
-    if (root.left_id == 0) {
-        return (min=root, parent=parent);
+} (curr : Limit, parent : Limit) -> (min : Limit, parent : Limit) {
+    if (curr.left_id == 0) {
+        return (min=curr, parent=parent);
     }
-    let (left) = limits.read(root.left_id);
-    return find_min(left, root);
+    let (left) = limits.read(curr.left_id);
+    return find_min(curr=left, parent=curr);
 }
 
 // Utility function to handle printing of tree nodes in left to right order.
@@ -356,7 +365,7 @@ func print_dfs_in_order{
     }
     %{ 
         print("    ", end="")
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.order_len, ids.root.order_head, ids.root.order_tail, ids.root.tree_id))
+        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.order_len, ids.root.order_head, ids.root.order_tail, ids.root.tree_id, ids.root.market_id))
     %}
     if (right_exists == 1) {
         let (right) = limits.read(root.right_id);
@@ -374,7 +383,7 @@ func print_limit_order{
     range_check_ptr,
 } (limit : Limit) {
     %{ 
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id)) 
+        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }

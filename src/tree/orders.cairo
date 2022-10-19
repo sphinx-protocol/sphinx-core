@@ -40,7 +40,7 @@ func lengths(limit_id : felt) -> (len : felt) {
 
 // Stores latest order id.
 @storage_var
-func curr_id() -> (id : felt) {
+func curr_order_id() -> (id : felt) {
 }
 
 @constructor
@@ -49,7 +49,7 @@ func constructor{
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
 } () {
-    curr_id.write(1);
+    curr_order_id.write(1);
     return ();
 }
 
@@ -67,12 +67,12 @@ func push{
 } (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) {
     alloc_locals;
 
-    let (id) = curr_id.read();
+    let (id) = curr_order_id.read();
     tempvar new_order: Order* = new Order(
         id=id, next_id=0, prev_id=0, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
     );
     orders.write(id, [new_order]);
-    curr_id.write(id + 1);
+    curr_order_id.write(id + 1);
 
     let (length) = lengths.read(limit_id);
     if (length == 0) {
