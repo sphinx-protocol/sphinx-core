@@ -97,7 +97,7 @@ func create_market{
 
 // Submit a new bid (limit buy order) to a given market.
 // @param orders_addr : deployed address of IOrdersContract [TEMPORARY - FOR TESTING ONLY]
-// @param limits_addr : deployed address of ILimitsContract [TEMPORARY - FOR TESTING ONLY]\
+// @param limits_addr : deployed address of ILimitsContract [TEMPORARY - FOR TESTING ONLY]
 // @param market_id : ID of market
 // @param is_buy : 1 if buy order, 0 if sell order
 // @param price : limit price of order
@@ -110,53 +110,18 @@ func create_bid{
     alloc_locals;
 
     let (market) = markets.read(market_id);
-    let (caller) = get_caller_address();
-    let (dt) = get_block_timestamp();
 
     if (is_buy == 1) {
         let is_limit = is_le(price, market.highest_bid - 1);
-        if (is_limit == 1) {
-            let (limit, _) = ILimitsContract.find(limits_addr, price, market.bid_tree_id);
-            if (limit.id == 0) {
-                with_attr error_message("Failed to insert new limit price and push order") {
-                    let (new_limit) = ILimitsContract.insert(limits_addr, price, market.bid_tree_id, market.id);
-                    let success = is_le(1, new_limit.id);
-                    assert success = 1;
-                    IOrdersContract.push(orders_addr, is_buy, price, amount, dt, caller, new_limit.id);
-                }
-                handle_revoked_refs();       
-            } else {
-                IOrdersContract.push(orders_addr, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=caller, limit_id=limit.id);
-                handle_revoked_refs();
-            }
-        } else {
-            // buy();
-            handle_revoked_refs();
-        }
+        create_bid_helper(orders_addr, limits_addr, market, is_limit, is_buy, price, amount, market.bid_tree_id);
+        handle_revoked_refs();
     } else {
         handle_revoked_refs();
     }
-
     if (is_buy == 0) {
         let is_limit = is_le(market.lowest_ask, price - 1);
-        if (is_limit == 1) {
-            let (limit, _) = ILimitsContract.find(limits_addr, price, market.ask_tree_id);
-            if (limit.id == 0) {
-                with_attr error_message("Failed to insert new limit price and push order") {
-                    let (new_limit) = ILimitsContract.insert(limits_addr, price, market.ask_tree_id, market.id);
-                    let success = is_le(1, new_limit.id);
-                    assert success = 1;
-                    IOrdersContract.push(orders_addr, is_buy, price, amount, dt, caller, new_limit.id);
-                }
-                handle_revoked_refs();       
-            } else {
-                IOrdersContract.push(orders_addr, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=caller, limit_id=limit.id);
-                handle_revoked_refs();
-            }
-        } else {
-            // sell();
-            handle_revoked_refs();
-        }
+        create_bid_helper(orders_addr, limits_addr, market, is_limit, is_buy, price, amount, market.ask_tree_id);
+        handle_revoked_refs();
     } else {
         handle_revoked_refs();
     }
@@ -164,27 +129,40 @@ func create_bid{
     return ();
 }
 
-// if is buy order:
-//    if price is lower than highest bid
-//        if limit price already exists
-//            push order to limit price
-//        else 
-//            create new limit price and push order
-//    else 
-//        keep filling lowest order up to limit price
-//        if order fills partially
-//            add it to the order book
-// else if is sell order:
-//    if price is higher than lowest ask
-//        if limit price already exists
-//            push order to limit price
-//        else 
-//            create new limit price and push order
-//    else 
-//        keep filling lowest order up to limit price
-//        if order fills partially
-//            add it to the order book
+func create_bid_helper{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} ( 
+    orders_addr : felt, limits_addr : felt, market : Market, is_limit : felt, is_buy : felt, 
+    price : felt, amount : felt, tree_id : felt
+) {
+    alloc_locals;
 
+    let (caller) = get_caller_address();
+    let (dt) = get_block_timestamp();
+
+    if (is_limit == 1) {
+        let (limit, _) = ILimitsContract.find(limits_addr, price, tree_id);
+        if (limit.id == 0) {
+            with_attr error_message("Failed to insert new limit price and push order") {
+                let (new_limit) = ILimitsContract.insert(limits_addr, price, tree_id, market.id);
+                let success = is_le(1, new_limit.id);
+                assert success = 1;
+                IOrdersContract.push(orders_addr, is_buy, price, amount, dt, caller, new_limit.id);
+            }
+            handle_revoked_refs();       
+        } else {
+            IOrdersContract.push(orders_addr, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=caller, limit_id=limit.id);
+            handle_revoked_refs();
+        }
+    } else {
+        // buy();
+        handle_revoked_refs();
+    }
+
+    return ();
+}
 
 // Utility function to handle revoked implicit references.
 // @dev tempvars used to handle revoked implict references
