@@ -2,36 +2,36 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.tree.orders import (
-    Node, Order, curr_id, push, pop, shift, get, set, remove
+    Order, curr_id, push, pop, shift, get, set, remove
 )
 
 // @external
 // func test_push_order{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
-//     order_push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
+//     push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
 //     return ();
 // }
 
 // @external
 // func setup_get_order{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
-//     order_push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
+//     push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
 //     return ();
 // }
 
 // @external
 // func test_get_order{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
-//     let (order) = order_get(limit_id=1, idx=0);
+//     let (order) = get(limit_id=1, idx=0);
 //     return ();
 // }
 
 // @external
 // func setup_consume_order{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
-//     order_push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
+//     push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
 //     return ();
 // }
 
 // @external
 // func test_consume_order{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
-//     order_consume(limit_id=1);
+//     shift(limit_id=1);
 //     return ();
 // }
 
@@ -55,10 +55,9 @@ func test_orders{
     remove(limit_id=1, idx=1);
     remove(limit_id=1, idx=0);
 
-    tempvar new_order : Order* = new Order(id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0);
-    set(limit_id=2, idx=0, new_order=[new_order]);
+    set(limit_id=2, idx=0, is_buy=0, price=24, amount=450, dt=1666093666, owner=123456);
 
-    get(limit_id=2, idx=0);
+    get(limit_id=2, idx=1);
 
     return ();
 }

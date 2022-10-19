@@ -5,15 +5,11 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 
-struct Node {
-    id : felt,
-    next_id : felt,
-    prev_id : felt,
-}
-
 // Data structure representing an order.
 struct Order {
     id : felt,
+    next_id : felt,
+    prev_id : felt,
     is_buy : felt, // 1 = buy, 0 = sell
     price : felt,
     amount : felt,
@@ -23,11 +19,6 @@ struct Order {
 }
 
 // Stores orders in doubly linked lists.
-@storage_var
-func nodes(id : felt) -> (node : Node) {
-}
-
-// Stores details of orders as mapping.
 @storage_var
 func orders(id : felt) -> (order : Order) {
 }
@@ -47,7 +38,7 @@ func tails(limit_id : felt) -> (id : felt) {
 func lengths(limit_id : felt) -> (len : felt) {
 }
 
-// Stores latest node id.
+// Stores latest order id.
 @storage_var
 func curr_id() -> (id : felt) {
 }
@@ -60,25 +51,6 @@ func constructor{
 } () {
     curr_id.write(1);
     return ();
-}
-
-// Create new node for doubly linked list.
-// @param val : new value
-// @param next_id : id of next value
-// @return new_node : node representation of new value
-func create_node{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} () -> (new_node : Node) {
-    alloc_locals;
-
-    let (id) = curr_id.read();
-    tempvar new_node: Node* = new Node(id=id, next_id=0, prev_id=0);
-    nodes.write(id, [new_node]);
-    curr_id.write(id + 1);
-
-    return (new_node=[new_node]);
 }
 
 // Insert new order to the list.
@@ -95,40 +67,48 @@ func push{
 } (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) {
     alloc_locals;
 
-    let (new_node) = create_node();
+    let (id) = curr_id.read();
     tempvar new_order: Order* = new Order(
-        id=new_node.id, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
+        id=id, next_id=0, prev_id=0, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
     );
-    orders.write(new_node.id, [new_order]);
+    orders.write(id, [new_order]);
+    curr_id.write(id + 1);
 
     let (length) = lengths.read(limit_id);
     if (length == 0) {
-        heads.write(limit_id, new_node.id);
-        tails.write(limit_id, new_node.id);
+        heads.write(limit_id, new_order.id);
+        tails.write(limit_id, new_order.id);
         handle_revoked_refs();
     } else {
         let (tail_id) = tails.read(limit_id);
-        let (tail) = nodes.read(tail_id);
-        tempvar new_tail: Node* = new Node(id=tail.id, next_id=new_node.id, prev_id=tail.prev_id);
-        nodes.write(tail_id, [new_tail]);
-        tempvar new_node_updated: Node* = new Node(id=new_node.id, next_id=new_node.id, prev_id=tail_id);
-        nodes.write(new_node.id, [new_node_updated]);
-        tails.write(limit_id, new_node.id);
+        let (tail) = orders.read(tail_id);
+        tempvar new_tail: Order* = new Order(
+            id=tail.id, next_id=new_order.id, prev_id=tail.prev_id, is_buy=tail.is_buy, 
+            price=tail.price, amount=tail.amount, dt=tail.dt, owner=tail.owner, limit_id=tail.limit_id
+        );
+        orders.write(tail_id, [new_tail]);
+        tempvar new_order_updated: Order* = new Order(
+            id=new_order.id, next_id=0, prev_id=tail_id, is_buy=new_order.is_buy, 
+            price=new_order.price, amount=new_order.amount, dt=new_order.dt, owner=new_order.owner, 
+            limit_id=new_order.limit_id
+        );
+        orders.write(new_order.id, [new_order_updated]);
+        tails.write(limit_id, new_order.id);
         handle_revoked_refs();
     }
 
     lengths.write(limit_id, length + 1);
 
     // Diagnostics
-    // let (head_id) = heads.read(limit_id);
-    // print_list(head_id, length + 1, 1);
+    let (head_id) = heads.read(limit_id);
+    print_list(head_id, length + 1, 1);
 
     return ();
 }
 
-// Remove item from the end of the list.
+// Remove order from the end of the list.
 // @param limit_id : limit ID of order list being amended
-// @return del : node deleted from list (or empty node if list is empty)
+// @return del : order deleted from list (or empty order if list is empty)
 func pop{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -137,41 +117,43 @@ func pop{
     alloc_locals;
     
     let (length) = lengths.read(limit_id);
+    tempvar empty_order: Order* = new Order(
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+    );
     if (length == 0) {
-        tempvar empty_order: Order* = new Order(id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0);
         return (del=[empty_order]);
     }
 
     let (head_id) = heads.read(limit_id);
     let (old_tail_id) = tails.read(limit_id);
-    let (old_tail) = nodes.read(old_tail_id);
+    let (old_tail) = orders.read(old_tail_id);
 
     if (length - 1 == 0) {
-        tempvar empty_node: Node* = new Node(id=0, next_id=0, prev_id=0);
-        nodes.write(head_id, [empty_node]);
-        nodes.write(old_tail_id, [empty_node]);
+        orders.write(head_id, [empty_order]);
+        orders.write(old_tail_id, [empty_order]);
         heads.write(limit_id, 0);
         tails.write(limit_id, 0);
         handle_revoked_refs();
     } else {
         tails.write(limit_id, old_tail.prev_id);
-        let (new_tail) = nodes.read(old_tail.prev_id);
-        tempvar new_tail_updated: Node* = new Node(id=new_tail.id, next_id=0, prev_id=new_tail.prev_id);
-        nodes.write(new_tail.id, [new_tail_updated]);
+        let (new_tail) = orders.read(old_tail.prev_id);
+        tempvar new_tail_updated: Order* = new Order(
+            id=new_tail.id, next_id=0, prev_id=new_tail.prev_id, is_buy=new_tail.is_buy, 
+            price=new_tail.price, amount=new_tail.amount, dt=new_tail.dt, owner=new_tail.owner, 
+            limit_id=new_tail.limit_id
+        );
+        orders.write(new_tail.id, [new_tail_updated]);
         handle_revoked_refs();
     }
 
-    tempvar old_tail_updated: Node* = new Node(id=old_tail.id, next_id=old_tail.next_id, prev_id=0);
-    nodes.write(old_tail.id, [old_tail_updated]);
     lengths.write(limit_id, length - 1);
-    let (del_order) = orders.read(old_tail.id);
 
     // Diagnostics
-    // %{ print("Deleted: ") %}
-    // print_order(del_order);
-    // print_list(head_id, length - 1, 1);
+    %{ print("Deleted: ") %}
+    print_order(old_tail);
+    print_list(head_id, length - 1, 1);
 
-    return (del=del_order);
+    return (del=old_tail);
 }
 
 // Remove order from head of list
@@ -185,52 +167,51 @@ func shift{
     alloc_locals;
 
     let (length) = lengths.read(limit_id);
-    tempvar empty_order: Order* = new Order(id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0);
+    tempvar empty_order: Order* = new Order(
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+    );
     if (length == 0) {
         return (del=[empty_order]);
     }
 
     let (old_head_id) = heads.read(limit_id);
-    let (old_head) = nodes.read(old_head_id);
+    let (old_head) = orders.read(old_head_id);
 
     if (length - 1 == 0) {
-        tempvar empty_node: Node* = new Node(id=0, next_id=0, prev_id=0);
-        nodes.write(old_head_id, [empty_node]);
-        let (tail_id) = tails.read(limit_id);
-        nodes.write(tail_id, [empty_node]);
         heads.write(limit_id, 0);
         tails.write(limit_id, 0);
         handle_revoked_refs();
     } else {
         heads.write(limit_id, old_head.next_id);
-        let (new_head) = nodes.read(old_head.next_id);
-        tempvar new_head_updated: Node* = new Node(id=new_head.id, next_id=new_head.next_id, prev_id=0);
-        nodes.write(new_head.id, [new_head_updated]);
+        let (new_head) = orders.read(old_head.next_id);
+        tempvar new_head_updated: Order* = new Order(
+            id=new_head.id, next_id=new_head.next_id, prev_id=0, is_buy=new_head.is_buy, 
+            price=new_head.price, amount=new_head.amount, dt=new_head.dt, owner=new_head.owner, 
+            limit_id=new_head.limit_id
+        );
+        orders.write(new_head.id, [new_head_updated]);
         handle_revoked_refs();
     }
 
-    tempvar old_head_updated: Node* = new Node(id=old_head.id, next_id=0, prev_id=old_head.prev_id);
-    nodes.write(old_head.id, [old_head_updated]);
     lengths.write(limit_id, length - 1);
-    let (del_order) = orders.read(old_head.id);
 
     // Diagnostics
-    // %{ print("Deleted: ") %}
-    // print_order(del_order);
-    // let (head_id) = heads.read(limit_id);
-    // let length_positive = is_le(1, length - 1);
-    // if (length_positive == 1) {
-    //     print_list(head_id, length - 1, 1);
-    //     handle_revoked_refs();
-    // } else {
-    //     %{ 
-    //         print("No orders remaining") 
-    //         print("") 
-    //     %}
-    //     handle_revoked_refs();
-    // }
+    %{ print("Deleted: ") %}
+    print_order(old_head);
+    let (head_id) = heads.read(limit_id);
+    let length_positive = is_le(1, length - 1);
+    if (length_positive == 1) {
+        print_list(head_id, length - 1, 1);
+        handle_revoked_refs();
+    } else {
+        %{ 
+            print("No orders remaining") 
+            print("") 
+        %}
+        handle_revoked_refs();
+    }
 
-    return (del=del_order);
+    return (del=old_head);
 } 
 
 // Retrieve order at particular position in the list.
@@ -244,83 +225,101 @@ func get{
 } (limit_id : felt, idx : felt) -> (order : Order) {
     alloc_locals;
     
+    tempvar empty_order: Order* = new Order(
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+    );
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
-        tempvar empty_order: Order* = new Order(id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0);
         return (order=[empty_order]);
     }
 
     let (head_id) = heads.read(limit_id);
-    let (head) = nodes.read(head_id);
+    let (head) = orders.read(head_id);
     let (tail_id) = tails.read(limit_id);
-    let (tail) = nodes.read(tail_id);
+    let (tail) = orders.read(tail_id);
 
     let (length) = lengths.read(limit_id);
     let (half_length, _) = unsigned_div_rem(length, 2);
     let less_than_half = is_le(idx, half_length);
 
     if (less_than_half == 1) {
-        let (node) = locate_item_from_head(i=0, idx=idx, curr=head);
-        let (order) = orders.read(node.id);
+        let (order) = locate_item_from_head(i=0, idx=idx, curr=head);
         // Diagnostics
-        // %{ print("Retrieved: ") %}
-        // print_order(order);
+        %{ print("Retrieved: ") %}
+        print_order(order);
         return (order=order);
     } else {
-        let (node) = locate_item_from_tail(i=length-1, idx=idx, curr=tail);
-        let (order) = orders.read(node.id);
-         // Diagnostics
-        // %{ print("Retrieved: ") %}
-        // print_order(order);
+        let (order) = locate_item_from_tail(i=length-1, idx=idx, curr=tail);
+        // Diagnostics
+        %{ print("Retrieved: ") %}
+        print_order(order);
         return (order=order);
     }
 }
 
+// Iterate through list to find item from head element.
+// @param i : current iteration
+// @param idx : list position to be found
+// @param curr : order in current iteration of the list
 func locate_item_from_head{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (i : felt, idx : felt, curr : Node) -> (node : Node) {
+} (i : felt, idx : felt, curr : Order) -> (order : Order) {
     if (i == idx) {
-        return (node=curr);
+        return (order=curr);
     }
-    let (next) = nodes.read(curr.next_id);
+    let (next) = orders.read(curr.next_id);
     return locate_item_from_head(i + 1, idx, next);
 }
 
+// Iterate through list to find item from tail element.
+// @param i : current iteration
+// @param idx : list position to be found
+// @param curr : order in current iteration of the list
 func locate_item_from_tail{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (i : felt, idx : felt, curr : Node) -> (node : Node) {
+} (i : felt, idx : felt, curr : Order) -> (order : Order) {
     if (i == idx) {
-        return (node=curr);
+        return (order=curr);
     }
-    let (prev) = nodes.read(curr.prev_id);
+    let (prev) = orders.read(curr.prev_id);
     return locate_item_from_tail(i - 1, idx, prev);
 }
 
 // Update order at particular position in the list.
 // @param limit_id : limit ID of order list being amended
 // @param idx : position of list to insert new value
-// @param new_order : new order to update
+// @param is_buy : 1 if buy order, 0 if sell order
+// @param price : limit price
+// @param amount : amount of order
+// @param dt : datetime of order entry
+// @param owner : owner of order
 // @return success : 1 if insertion was successful, 0 otherwise
 func set{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (limit_id : felt, idx : felt, new_order : Order) -> (success : felt) {
+} (
+    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt
+) -> (success : felt) {
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (success=0);
     }
-    let (node) = get(limit_id, idx);
-    orders.write(node.id, new_order);
+    let (order) = get(limit_id, idx);
+    tempvar new_order : Order* = new Order(
+        id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, 
+        price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
+    );
+    orders.write(order.id, [new_order]);
 
     // Diagnostics
-    // let (head_id) = heads.read(limit_id);
-    // let (length) = lengths.read(limit_id);
-    // print_list(head_id, length, 1);
+    let (head_id) = heads.read(limit_id);
+    let (length) = lengths.read(limit_id);
+    print_list(head_id, length, 1);
 
     return (success=1);
 }
@@ -328,7 +327,7 @@ func set{
 // Remove value at particular position in the list.
 // @param limit_id : limit ID of order list being amended
 // @param idx : list item to be deleted
-// @return del : deleted Node
+// @return del : deleted Order
 func remove{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -336,7 +335,9 @@ func remove{
 } (limit_id : felt, idx : felt) -> (del : Order) {
     alloc_locals;
 
-    tempvar empty_order: Order* = new Order(id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0);
+    tempvar empty_order: Order* = new Order(
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+    );
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (del=[empty_order]);
@@ -352,24 +353,31 @@ func remove{
     }
 
     let (removed_order) = get(limit_id, idx);
-    let (removed) = nodes.read(removed_order.id);
-    let (removed_prev) = nodes.read(removed.prev_id);
-    tempvar updated_removed_prev: Node* = new Node(id=removed_prev.id, next_id=removed.next_id, prev_id=removed_prev.prev_id); 
-    nodes.write(removed_prev.id, [updated_removed_prev]);
-    let (removed_next) = nodes.read(removed.next_id);
-    tempvar updated_removed_next: Node* = new Node(id=removed_next.id, next_id=removed_next.next_id, prev_id=removed.prev_id); 
-    nodes.write(removed_next.id, [updated_removed_next]);
-    tempvar updated_removed: Node* = new Node(id=removed.id, next_id=0, prev_id=0); 
-    nodes.write(removed.id, [updated_removed]);
+    let (removed) = orders.read(removed_order.id);
+
+    let (removed_prev) = orders.read(removed.prev_id);
+    tempvar updated_removed_prev: Order* = new Order(
+        id=removed_prev.id, next_id=removed.next_id, prev_id=removed_prev.prev_id, is_buy=removed_prev.is_buy, 
+        price=removed_prev.price, amount=removed_prev.amount, dt=removed_prev.dt, owner=removed_prev.owner, 
+        limit_id=removed_prev.limit_id
+    ); 
+    orders.write(removed_prev.id, [updated_removed_prev]);
+
+    let (removed_next) = orders.read(removed.next_id);
+    tempvar updated_removed_next: Order* = new Order(
+        id=removed_next.id, next_id=removed_next.next_id, prev_id=removed.prev_id, is_buy=removed_next.is_buy, 
+        price=removed_next.price, amount=removed_next.amount, dt=removed_next.dt, owner=removed_next.owner, 
+        limit_id=removed_next.limit_id
+    ); 
+    orders.write(removed_next.id, [updated_removed_next]);
 
     lengths.write(limit_id, length - 1);
-    let (del_order) = orders.read(removed.id);
 
     // Diagnostics
-    // let (head_id) = heads.read(limit_id);
-    // print_list(head_id, length + 1, 1);
+    let (head_id) = heads.read(limit_id);
+    print_list(head_id, length + 1, 1);
 
-    return (del=del_order);
+    return (del=removed);
 }
 
 // Utility function to check idx is not out of bounds.
@@ -416,10 +424,9 @@ func print_list{
     let (order) = orders.read(node_loc);
     %{
         print("    ", end="")
-        print("id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
     %}
-    let (node) = nodes.read(node_loc);
-    return print_list(node.next_id, idx - 1, 0);
+    return print_list(order.next_id, idx - 1, 0);
 }
 
 // Utility function for printing order.
@@ -430,7 +437,7 @@ func print_order{
 } (order : Order) {
     %{
         print("    ", end="")
-        print("id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
     %}
     return ();
 }
