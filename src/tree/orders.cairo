@@ -99,7 +99,7 @@ func push{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-} (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) {
+} (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
     alloc_locals;
 
     let (id) = curr_order_id.read();
@@ -110,10 +110,17 @@ func push{
     curr_order_id.write(id + 1);
 
     let (length) = lengths.read(limit_id);
+    lengths.write(limit_id, length + 1);
     if (length == 0) {
         heads.write(limit_id, new_order.id);
         tails.write(limit_id, new_order.id);
         handle_revoked_refs();
+
+        // Diagnostics
+        let (head_id) = heads.read(limit_id);
+        print_list(head_id, length + 1, 1);
+        
+        return (new_order=[new_order]);
     } else {
         let (tail_id) = tails.read(limit_id);
         let (tail) = orders.read(tail_id);
@@ -130,15 +137,13 @@ func push{
         orders.write(new_order.id, [new_order_updated]);
         tails.write(limit_id, new_order.id);
         handle_revoked_refs();
+
+        // Diagnostics
+        let (head_id) = heads.read(limit_id);
+        print_list(head_id, length + 1, 1);
+
+        return (new_order=[new_order_updated]);
     }
-
-    lengths.write(limit_id, length + 1);
-
-    // Diagnostics
-    let (head_id) = heads.read(limit_id);
-    print_list(head_id, length + 1, 1);
-
-    return ();
 }
 
 // Remove order from the end of the list.

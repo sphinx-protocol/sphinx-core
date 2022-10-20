@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.tree.orders import (
-    Order, curr_id, push, pop, shift, get, set, remove
+    Order, curr_order_id, push, pop, shift, get, set, remove
 )
 
 // @external
@@ -44,7 +44,7 @@ func test_orders{
     alloc_locals;
 
     // Constructor
-    curr_id.write(1);
+    curr_order_id.write(1);
 
     // Add orders to queue
     push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
