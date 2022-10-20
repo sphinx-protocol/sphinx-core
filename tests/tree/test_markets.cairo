@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.tree.markets import (
-    create_market, create_bid
+    curr_market_id, curr_tree_id, create_market, create_bid
 )
 
 @external
@@ -13,6 +13,13 @@ func test_markets{
 } () {
     alloc_locals;
 
+    // Start prank - set caller address
+    %{ stop_prank_callable = start_prank(123456789) %}
+
+    // Constructor
+    curr_market_id.write(1);
+    curr_tree_id.write(1);
+
     // Deploy contracts
     local orders_contract_address: felt;
     local limits_contract_address: felt;
@@ -21,8 +28,12 @@ func test_markets{
 
     let (new_market) = create_market(base_asset=123213123123, quote_asset=788978978998);
     create_bid(orders_addr=orders_contract_address, limits_addr=limits_contract_address, market_id=new_market.id, 
-    is_buy=1, price=95, amount=1000);
+    price=95, amount=1000);
+    create_bid(orders_addr=orders_contract_address, limits_addr=limits_contract_address, market_id=new_market.id, 
+    price=95, amount=200);
 
     
+
+    %{ stop_prank_callable() %}
     return ();
 }

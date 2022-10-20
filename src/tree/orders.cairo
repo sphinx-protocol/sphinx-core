@@ -13,6 +13,7 @@ struct Order {
     is_buy : felt, // 1 = buy, 0 = sell
     price : felt,
     amount : felt,
+    filled : felt,
     dt : felt,
     owner : felt,
     limit_id : felt,
@@ -53,6 +54,39 @@ func constructor{
     return ();
 }
 
+// Getter for head ID.
+@external
+func get_head{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (limit_id : felt) -> (head_id : felt) {
+    let (head_id) = heads.read(limit_id);
+    return (head_id=head_id);
+}
+
+// Getter for tail ID.
+@external
+func get_tail{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (limit_id : felt) -> (tail_id : felt) {
+    let (tail_id) = tails.read(limit_id);
+    return (tail_id=tail_id);
+}
+
+// Getter for list length.
+@external
+func get_length{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (limit_id : felt) -> (len : felt) {
+    let (len) = lengths.read(limit_id);
+    return (len=len);
+}
+
 // Insert new order to the list.
 // @param is_buy : 1 if buy order, 0 if sell order
 // @param price : limit price
@@ -60,6 +94,7 @@ func constructor{
 // @param dt : datetime of order entry
 // @param owner : owner of order
 // @param limit_id : ID of limit price corresponding to order
+@external
 func push{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -69,7 +104,7 @@ func push{
 
     let (id) = curr_order_id.read();
     tempvar new_order: Order* = new Order(
-        id=id, next_id=0, prev_id=0, is_buy=is_buy, price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
+        id=id, next_id=0, prev_id=0, is_buy=is_buy, price=price, amount=amount, filled=0, dt=dt, owner=owner, limit_id=limit_id
     );
     orders.write(id, [new_order]);
     curr_order_id.write(id + 1);
@@ -84,13 +119,13 @@ func push{
         let (tail) = orders.read(tail_id);
         tempvar new_tail: Order* = new Order(
             id=tail.id, next_id=new_order.id, prev_id=tail.prev_id, is_buy=tail.is_buy, 
-            price=tail.price, amount=tail.amount, dt=tail.dt, owner=tail.owner, limit_id=tail.limit_id
+            price=tail.price, amount=tail.amount, filled=tail.filled, dt=tail.dt, owner=tail.owner, limit_id=tail.limit_id
         );
         orders.write(tail_id, [new_tail]);
         tempvar new_order_updated: Order* = new Order(
             id=new_order.id, next_id=0, prev_id=tail_id, is_buy=new_order.is_buy, 
-            price=new_order.price, amount=new_order.amount, dt=new_order.dt, owner=new_order.owner, 
-            limit_id=new_order.limit_id
+            price=new_order.price, amount=new_order.amount, filled=new_order.filled, dt=new_order.dt, 
+            owner=new_order.owner, limit_id=new_order.limit_id
         );
         orders.write(new_order.id, [new_order_updated]);
         tails.write(limit_id, new_order.id);
@@ -109,6 +144,7 @@ func push{
 // Remove order from the end of the list.
 // @param limit_id : limit ID of order list being amended
 // @return del : order deleted from list (or empty order if list is empty)
+@external
 func pop{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -118,7 +154,7 @@ func pop{
     
     let (length) = lengths.read(limit_id);
     tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
     if (length == 0) {
         return (del=[empty_order]);
@@ -138,8 +174,8 @@ func pop{
         tails.write(limit_id, old_tail.prev_id);
         let (new_tail) = orders.read(old_tail.prev_id);
         tempvar new_tail_updated: Order* = new Order(
-            id=new_tail.id, next_id=0, prev_id=new_tail.prev_id, is_buy=new_tail.is_buy, 
-            price=new_tail.price, amount=new_tail.amount, dt=new_tail.dt, owner=new_tail.owner, 
+            id=new_tail.id, next_id=0, prev_id=new_tail.prev_id, is_buy=new_tail.is_buy, price=new_tail.price,  
+            amount=new_tail.amount, filled=new_tail.filled, dt=new_tail.dt, owner=new_tail.owner, 
             limit_id=new_tail.limit_id
         );
         orders.write(new_tail.id, [new_tail_updated]);
@@ -149,9 +185,9 @@ func pop{
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    %{ print("Deleted: ") %}
-    print_order(old_tail);
-    print_list(head_id, length - 1, 1);
+    // %{ print("Deleted: ") %}
+    // print_order(old_tail);
+    // print_list(head_id, length - 1, 1);
 
     return (del=old_tail);
 }
@@ -159,6 +195,7 @@ func pop{
 // Remove order from head of list
 // @param limit_id : limit ID of order list being amended
 // @return del : deleted order
+@external
 func shift{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -168,7 +205,7 @@ func shift{
 
     let (length) = lengths.read(limit_id);
     tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
     if (length == 0) {
         return (del=[empty_order]);
@@ -185,8 +222,8 @@ func shift{
         heads.write(limit_id, old_head.next_id);
         let (new_head) = orders.read(old_head.next_id);
         tempvar new_head_updated: Order* = new Order(
-            id=new_head.id, next_id=new_head.next_id, prev_id=0, is_buy=new_head.is_buy, 
-            price=new_head.price, amount=new_head.amount, dt=new_head.dt, owner=new_head.owner, 
+            id=new_head.id, next_id=new_head.next_id, prev_id=0, is_buy=new_head.is_buy, price=new_head.price, 
+            amount=new_head.amount, filled=new_head.filled, dt=new_head.dt, owner=new_head.owner, 
             limit_id=new_head.limit_id
         );
         orders.write(new_head.id, [new_head_updated]);
@@ -196,20 +233,20 @@ func shift{
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    %{ print("Deleted: ") %}
-    print_order(old_head);
-    let (head_id) = heads.read(limit_id);
-    let length_positive = is_le(1, length - 1);
-    if (length_positive == 1) {
-        print_list(head_id, length - 1, 1);
-        handle_revoked_refs();
-    } else {
-        %{ 
-            print("No orders remaining") 
-            print("") 
-        %}
-        handle_revoked_refs();
-    }
+    // %{ print("Deleted: ") %}
+    // print_order(old_head);
+    // let (head_id) = heads.read(limit_id);
+    // let length_positive = is_le(1, length - 1);
+    // if (length_positive == 1) {
+    //     print_list(head_id, length - 1, 1);
+    //     handle_revoked_refs();
+    // } else {
+    //     %{ 
+    //         print("No orders remaining") 
+    //         print("") 
+    //     %}
+    //     handle_revoked_refs();
+    // }
 
     return (del=old_head);
 } 
@@ -218,6 +255,7 @@ func shift{
 // @param limit_id : limit ID of order list being amended
 // @param idx : order to retrieve
 // @return order : retrieved order
+@view
 func get{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -226,7 +264,7 @@ func get{
     alloc_locals;
     
     tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
@@ -245,14 +283,14 @@ func get{
     if (less_than_half == 1) {
         let (order) = locate_item_from_head(i=0, idx=idx, curr=head);
         // Diagnostics
-        %{ print("Retrieved: ") %}
-        print_order(order);
+        // %{ print("Retrieved: ") %}
+        // print_order(order);
         return (order=order);
     } else {
         let (order) = locate_item_from_tail(i=length-1, idx=idx, curr=tail);
         // Diagnostics
-        %{ print("Retrieved: ") %}
-        print_order(order);
+        // %{ print("Retrieved: ") %}
+        // print_order(order);
         return (order=order);
     }
 }
@@ -298,12 +336,13 @@ func locate_item_from_tail{
 // @param dt : datetime of order entry
 // @param owner : owner of order
 // @return success : 1 if insertion was successful, 0 otherwise
+@external
 func set{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
 } (
-    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt
+    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
 ) -> (success : felt) {
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
@@ -311,15 +350,15 @@ func set{
     }
     let (order) = get(limit_id, idx);
     tempvar new_order : Order* = new Order(
-        id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, 
-        price=price, amount=amount, dt=dt, owner=owner, limit_id=limit_id
+        id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
+        amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
     );
     orders.write(order.id, [new_order]);
 
     // Diagnostics
-    let (head_id) = heads.read(limit_id);
-    let (length) = lengths.read(limit_id);
-    print_list(head_id, length, 1);
+    // let (head_id) = heads.read(limit_id);
+    // let (length) = lengths.read(limit_id);
+    // print_list(head_id, length, 1);
 
     return (success=1);
 }
@@ -328,6 +367,7 @@ func set{
 // @param limit_id : limit ID of order list being amended
 // @param idx : list item to be deleted
 // @return del : deleted Order
+@external
 func remove{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -336,7 +376,7 @@ func remove{
     alloc_locals;
 
     tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, dt=0, owner=0, limit_id=0
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
@@ -358,24 +398,24 @@ func remove{
     let (removed_prev) = orders.read(removed.prev_id);
     tempvar updated_removed_prev: Order* = new Order(
         id=removed_prev.id, next_id=removed.next_id, prev_id=removed_prev.prev_id, is_buy=removed_prev.is_buy, 
-        price=removed_prev.price, amount=removed_prev.amount, dt=removed_prev.dt, owner=removed_prev.owner, 
-        limit_id=removed_prev.limit_id
+        price=removed_prev.price, amount=removed_prev.amount, filled=removed_prev.filled, dt=removed_prev.dt, 
+        owner=removed_prev.owner, limit_id=removed_prev.limit_id
     ); 
     orders.write(removed_prev.id, [updated_removed_prev]);
 
     let (removed_next) = orders.read(removed.next_id);
     tempvar updated_removed_next: Order* = new Order(
         id=removed_next.id, next_id=removed_next.next_id, prev_id=removed.prev_id, is_buy=removed_next.is_buy, 
-        price=removed_next.price, amount=removed_next.amount, dt=removed_next.dt, owner=removed_next.owner, 
-        limit_id=removed_next.limit_id
+        price=removed_next.price, amount=removed_next.amount, filled=removed_next.filled, dt=removed_next.dt, 
+        owner=removed_next.owner, limit_id=removed_next.limit_id
     ); 
     orders.write(removed_next.id, [updated_removed_next]);
 
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    let (head_id) = heads.read(limit_id);
-    print_list(head_id, length + 1, 1);
+    // let (head_id) = heads.read(limit_id);
+    // print_list(head_id, length + 1, 1);
 
     return (del=removed);
 }
@@ -404,6 +444,7 @@ func validate_idx{
 }
 
 // Utility function for printing list.
+@view
 func print_list{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -424,12 +465,13 @@ func print_list{
     let (order) = orders.read(node_loc);
     %{
         print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
     %}
     return print_list(order.next_id, idx - 1, 0);
 }
 
 // Utility function for printing order.
+@view
 func print_order{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -437,7 +479,7 @@ func print_order{
 } (order : Order) {
     %{
         print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
     %}
     return ();
 }
