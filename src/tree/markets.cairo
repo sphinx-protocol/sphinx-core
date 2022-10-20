@@ -30,7 +30,7 @@ namespace IOrdersContract {
     func get_length(limit_id : felt) -> (len : felt) {
     }
     // Insert new order to the list.
-    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) {
+    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
     }
     // Remove order from head of list
     func shift(limit_id : felt) -> (del : Order) {
@@ -86,6 +86,16 @@ func curr_market_id() -> (id : felt) {
 func curr_tree_id() -> (id : felt) {
 }
 
+// Emit create market event.
+@event
+func log_create_market(id : felt, bid_tree_id : felt, ask_tree_id : felt, lowest_ask : felt, highest_bid : felt, base_asset : felt, quote_asset : felt, controller : felt) {
+}
+
+// Emit create market event.
+@event
+func log_create_bid(id : felt, bid_tree_id : felt, ask_tree_id : felt, lowest_ask : felt, highest_bid : felt, base_asset : felt, quote_asset : felt, controller : felt) {
+}
+
 @constructor
 func constructor{
     syscall_ptr: felt*,
@@ -120,6 +130,11 @@ func create_market{
 
     curr_market_id.write(market_id + 1);
     curr_tree_id.write(tree_id + 2);
+
+    log_create_market.emit(
+        id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
+        base_asset=base_asset, quote_asset=quote_asset, controller=caller
+    );
 
     return (new_market=[new_market]);
 }
@@ -193,15 +208,20 @@ func create_bid_helper{
     return ();
 }
 
-// func buy{
-//     syscall_ptr: felt*,
-//     pedersen_ptr: HashBuiltin*,
-//     range_check_ptr,
-// } (orders_addr : felt, limits_addr : felt, market_id : felt, is_buy : felt, max_price : felt, amount : felt) {
-//     // Get head of order book
-//     // If 
-
-// }
+func buy{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (orders_addr : felt, limits_addr : felt, market_id : felt, is_buy : felt, max_price : felt, amount : felt) {
+    // Get head of order book
+    // If price <= max_price 
+    //     If amount > filled
+    //         pop off order and fill
+    //     Else
+    //         partially fill order
+    // Else
+    //     Place order as limit order
+}
 
 func print_market{
     syscall_ptr: felt*,
