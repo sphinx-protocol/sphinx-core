@@ -55,7 +55,7 @@ func test_orders{
     remove(limit_id=1, idx=1);
     remove(limit_id=1, idx=0);
 
-    set(limit_id=2, idx=0, is_buy=0, price=24, amount=450, dt=1666093666, owner=123456);
+    set(limit_id=2, idx=0, is_buy=0, price=24, amount=450, filled=0, dt=1666093666, owner=123456);
 
     get(limit_id=2, idx=1);
 

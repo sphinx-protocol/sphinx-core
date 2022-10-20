@@ -43,11 +43,23 @@ func constructor{
     return ();
 }
 
+// Getter for limit price
+@external
+func get_limit{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (limit_id : felt) -> (limit : Limit) {
+    let (limit) = limits.read(limit_id);
+    return (limit=limit);
+}
+
 // Insert new limit price into BST.
 // @param price : new limit price to be inserted
 // @param tree_id : ID of tree currently being traversed
 // @param tree_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
+@external
 func insert{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -67,8 +79,8 @@ func insert{
         roots.write(tree_id, new_limit.id);
 
         // Diagnostics
-        let (new_root) = limits.read(new_limit.id);
-        print_dfs_in_order(new_root, 1);
+        // let (new_root) = limits.read(new_limit.id);
+        // print_dfs_in_order(new_root, 1);
 
         return (new_limit=[new_limit]);
     }
@@ -76,8 +88,8 @@ func insert{
     let (inserted) = insert_helper(price, root, new_limit.id, tree_id, market_id);
 
     // Diagnostics
-    let (new_root) = limits.read(root_id);
-    print_dfs_in_order(new_root, 1);
+    // let (new_root) = limits.read(root_id);
+    // print_dfs_in_order(new_root, 1);
 
     return (new_limit=inserted);
 }
@@ -148,19 +160,20 @@ func insert_helper{
 // @param tree_id : ID of tree currently being traversed
 // @return limit : retrieved limit price (or empty limit if not found)
 // @return parent : parent of retrieved limit price (or empty limit if not found)
+@view
 func find{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
 } (price : felt, tree_id : felt) -> (limit : Limit, parent : Limit) {    
     let (root_id) = roots.read(tree_id);
-    let (root) = limits.read(root_id);
     tempvar empty_limit: Limit* = new Limit(
         id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
     );
     if (root_id == 0) {
         return (limit=[empty_limit], parent=[empty_limit]);
     }
+    let (root) = limits.read(root_id);
     return find_helper(tree_id=tree_id, price=price, curr=root, parent=[empty_limit]);
 }
 
@@ -214,6 +227,7 @@ func find_helper{
 // @param tree_id : ID of tree currently being traversed
 // @param market_id : ID of current market
 // @return del : node representation of deleted limit price
+@external
 func delete{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -269,9 +283,9 @@ func delete{
     }
 
     // Diagnostics
-    let (root_id) = roots.read(tree_id);
-    let (new_root) = limits.read(root_id);
-    print_dfs_in_order(new_root, 1);
+    // let (root_id) = roots.read(tree_id);
+    // let (new_root) = limits.read(root_id);
+    // print_dfs_in_order(new_root, 1);
 
     return (del=limit);
 }
@@ -338,7 +352,30 @@ func find_min{
     return find_min(curr=left, parent=curr);
 }
 
+// Setter function to update details of limit price
+// @param limit : ID of limit price to update
+// @param new_vol : new volume
+// @return success : 1 if successfully inserted, 0 otherwise
+@external
+func update{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (limit_id : felt, total_vol : felt, order_len : felt, order_head : felt, order_tail : felt ) -> (success : felt) {
+    if (limit_id == 0) {
+        return (success=0);
+    }
+    let (limit) = limits.read(limit_id);
+    tempvar new_limit: Limit* = new Limit(
+        id=limit.id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
+        order_len=order_len, order_head=order_head, order_tail=order_tail, tree_id=limit.tree_id, market_id=limit.market_id
+    );
+    limits.write(limit_id, [new_limit]);
+    return (success=1);
+}
+
 // Utility function to handle printing of tree nodes in left to right order.
+@view
 func print_dfs_in_order{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
@@ -377,6 +414,7 @@ func print_dfs_in_order{
     return ();
 }
 
+@view
 func print_limit_order{
     syscall_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
