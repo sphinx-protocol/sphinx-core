@@ -87,6 +87,20 @@ func get_length{
     return (len=len);
 }
 
+// Getter for particular order.
+// @dev To be distinguished from get(), which retrieves order at particular position of a list. 
+// @param id : order ID
+// @return order : returned order
+@external
+func get_order{
+    syscall_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+} (id : felt) -> (order : Order) {
+    let (order) = orders.read(id);
+    return (order=order);
+}
+
 // Insert new order to the list.
 // @param is_buy : 1 if buy order, 0 if sell order
 // @param price : limit price
@@ -119,7 +133,7 @@ func push{
         // Diagnostics
         let (head_id) = heads.read(limit_id);
         print_list(head_id, length + 1, 1);
-        
+
         return (new_order=[new_order]);
     } else {
         let (tail_id) = tails.read(limit_id);
