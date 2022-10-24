@@ -1,12 +1,12 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.tree.balances import (
+from src.tree.users import (
     get_balance, set_balance, transfer_balance, transfer_to_order, transfer_from_order
 )
 
 @external
-func test_balances{
+func test_users{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,
     range_check_ptr
