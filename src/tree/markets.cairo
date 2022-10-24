@@ -43,7 +43,7 @@ namespace IOrdersContract {
     func get(limit_id : felt, idx : felt) -> (order : Order) {
     }
     // Update order at particular position in the list.
-    func set(limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt) -> 
+    func set(id : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt) -> 
         (success : felt) {
     }
     // Remove value at particular position in the list.
@@ -71,7 +71,7 @@ namespace ILimitsContract {
 }
 
 @contract_interface
-namespace IBalancesContract {
+namespace IUsersContract {
     // Getter for user balances
     func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
     }
@@ -183,7 +183,7 @@ func update_inside_quote{
 // Submit a new bid (limit buy order) to a given market.
 // @param orders_addr : deployed address of IOrdersContract [TEMPORARY - FOR TESTING ONLY]
 // @param limits_addr : deployed address of ILimitsContract [TEMPORARY - FOR TESTING ONLY]
-// @param balances_addr : deployed address of IBalancesContract [TEMPORARY - FOR TESTING ONLY]
+// @param balances_addr : deployed address of IUsersContract [TEMPORARY - FOR TESTING ONLY]
 // @param market_id : ID of market
 // @param price : limit price of order
 // @param amount : order size in number of tokens
@@ -219,7 +219,7 @@ func create_bid_helper{
 } (orders_addr : felt, limits_addr : felt, balances_addr : felt, market : Market, is_limit : felt, price : felt, amount : felt, tree_id : felt) -> (success : felt) {
     alloc_locals;
     let (caller) = get_caller_address();
-    let (account_balance) = IBalancesContract.get_balance(balances_addr, caller, market.base_asset, 1);
+    let (account_balance) = IUsersContract.get_balance(balances_addr, caller, market.base_asset, 1);
     let balance_sufficient = is_le(amount, account_balance);
     if (balance_sufficient == 0) {
         handle_revoked_refs();
@@ -278,7 +278,7 @@ func create_bid_helper{
             }
             handle_revoked_refs();
         }
-        let (update_balance_success) = IBalancesContract.transfer_to_order(balances_addr, caller, market.base_asset, amount);
+        let (update_balance_success) = IUsersContract.transfer_to_order(balances_addr, caller, market.base_asset, amount);
         with_attr error_message("Failed to update account balances") {
             assert update_balance_success = 1;
         }
@@ -306,15 +306,17 @@ func buy{
         if (is_partial_fill == 1) {
             // partially fill order
         } else {
-            // 
+            IOrdersContract.set(orders_addr, lowest_ask.id, lowest_ask.is_buy, lowest_ask.price, lowest_ask.amount, lowest_ask.amount, lowest_ask.dt, lowest_ask.owner);
+            IOrdersContract.shift(orders_addr, market.ask_tree_id);
+
         }
     } else {
-
+        
     }
 
     // Fully filling an order:
     // Set filled to amount
-    // Pop off order from list
+    // Shift off order from list
     // Update limit + market
     // Remove seller in-order balance of quote asset
     // Increase seller account balance of base asset
