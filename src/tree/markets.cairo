@@ -241,7 +241,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     }
 
     if (is_limit == 0) {
-        // buy();
+        buy(orders_addr, limits_addr, balances_addr, market.id, price, amount);
         handle_revoked_refs();
     } else {
         let (limit, _) = ILimitsContract.find(limits_addr, price, tree_id);
@@ -287,7 +287,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 }
 
 func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
-    (orders_addr : felt, limits_addr : felt, balances_addr : felt, market_id : felt, is_buy : felt, max_price : felt, amount : felt) 
+    (orders_addr : felt, limits_addr : felt, balances_addr : felt, market_id : felt, max_price : felt, amount : felt) 
         -> 
     (success : felt)
 {
@@ -299,6 +299,10 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         return (success=0);
     }
     let (lowest_ask) = IOrdersContract.get_order(orders_addr, market.lowest_ask);
+    if (lowest_ask.id == 0) {
+        return (success=0);
+    }
+
     let (base_amount, _) = unsigned_div_rem(amount, lowest_ask.price);
     let (account_balance) = IUsersContract.get_balance(caller, market.base_asset, 1);
     let is_sufficient = is_le(base_amount, account_balance);
@@ -351,7 +355,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
             log_offer_filled.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=amount, total_filled=amount);
             
             handle_revoked_refs();
-            buy(orders_addr, limits_addr, balances_addr, market_id, is_buy, max_price, amount - lowest_ask.amount); 
+            buy(orders_addr, limits_addr, balances_addr, market_id, max_price, amount - lowest_ask.amount); 
             return (success=1)
         }
     } else {
