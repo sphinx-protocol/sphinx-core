@@ -361,13 +361,13 @@ func set{
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
 } (
-    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
+    id : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
 ) -> (success : felt) {
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (success=0);
     }
-    let (order) = get(limit_id, idx);
+    let (order) = orders.read(id);
     tempvar new_order : Order* = new Order(
         id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
         amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
