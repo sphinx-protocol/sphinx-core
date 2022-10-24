@@ -45,44 +45,26 @@ func curr_order_id() -> (id : felt) {
 }
 
 @constructor
-func constructor{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} () {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     curr_order_id.write(1);
     return ();
 }
 
-// Getter for head ID.
+// Getter for head ID and tail ID.
 @external
-func get_head{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (head_id : felt) {
+func get_head_and_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (limit_id : felt) -> (head_id : felt, tail_id : felt) 
+{
     let (head_id) = heads.read(limit_id);
-    return (head_id=head_id);
-}
-
-// Getter for tail ID.
-@external
-func get_tail{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (tail_id : felt) {
     let (tail_id) = tails.read(limit_id);
-    return (tail_id=tail_id);
+    return (head_id=head_id, tail_id=tail_id);
 }
 
 // Getter for list length.
 @external
-func get_length{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (len : felt) {
+func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (limit_id : felt) -> (len : felt) 
+{
     let (len) = lengths.read(limit_id);
     return (len=len);
 }
@@ -92,11 +74,9 @@ func get_length{
 // @param id : order ID
 // @return order : returned order
 @external
-func get_order{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (id : felt) -> (order : Order) {
+func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (id : felt) -> (order : Order) 
+{
     let (order) = orders.read(id);
     return (order=order);
 }
@@ -109,11 +89,9 @@ func get_order{
 // @param owner : owner of order
 // @param limit_id : ID of limit price corresponding to order
 @external
-func push{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
+func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) 
+{
     alloc_locals;
 
     let (id) = curr_order_id.read();
@@ -164,11 +142,9 @@ func push{
 // @param limit_id : limit ID of order list being amended
 // @return del : order deleted from list (or empty order if list is empty)
 @external
-func pop{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (del : Order) {
+func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt) -> (del : Order) 
+{
     alloc_locals;
     
     let (length) = lengths.read(limit_id);
@@ -215,11 +191,9 @@ func pop{
 // @param limit_id : limit ID of order list being amended
 // @return del : deleted order
 @external
-func shift{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (del : Order) {
+func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt) -> (del : Order) 
+{
     alloc_locals;
 
     let (length) = lengths.read(limit_id);
@@ -275,11 +249,9 @@ func shift{
 // @param idx : order to retrieve
 // @return order : retrieved order
 @view
-func get{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt, idx : felt) -> (order : Order) {
+func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt, idx : felt) -> (order : Order) 
+{
     alloc_locals;
     
     tempvar empty_order: Order* = new Order(
@@ -318,11 +290,9 @@ func get{
 // @param i : current iteration
 // @param idx : list position to be found
 // @param curr : order in current iteration of the list
-func locate_item_from_head{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (i : felt, idx : felt, curr : Order) -> (order : Order) {
+func locate_item_from_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (i : felt, idx : felt, curr : Order) -> (order : Order) 
+{
     if (i == idx) {
         return (order=curr);
     }
@@ -334,11 +304,9 @@ func locate_item_from_head{
 // @param i : current iteration
 // @param idx : list position to be found
 // @param curr : order in current iteration of the list
-func locate_item_from_tail{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (i : felt, idx : felt, curr : Order) -> (order : Order) {
+func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (i : felt, idx : felt, curr : Order) -> (order : Order) 
+{
     if (i == idx) {
         return (order=curr);
     }
@@ -352,17 +320,16 @@ func locate_item_from_tail{
 // @param is_buy : 1 if buy order, 0 if sell order
 // @param price : limit price
 // @param amount : amount of order
+// @param filled : amount of order that has been filled
 // @param dt : datetime of order entry
 // @param owner : owner of order
 // @return success : 1 if insertion was successful, 0 otherwise
 @external
-func set{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (
-    id : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
-) -> (success : felt) {
+func set{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (id : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt) 
+        -> 
+    (success : felt) 
+{
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (success=0);
@@ -382,16 +349,40 @@ func set{
     return (success=1);
 }
 
+// Update filled amount of order.
+// @param id : order ID
+// @param filled : updated filled amount of order
+// @return success : 1 if update was successful, 0 otherwise
+@external
+func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (id : felt, filled : felt) -> (success : felt)
+{
+    let (order) = orders.read(id);
+    let is_valid = is_le(filled, order.amount);
+    let is_incremental = is_le(order.filled, filled - 1);
+    let is_positive = is_le(1, filled);
+    if (is_valid + is_incremental + is_positive == 3) {
+        tempvar new_order : Order* = new Order(
+            id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
+            amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
+        );
+        orders.write(order.id, [new_order]);
+        handle_revoked_refs();
+        return (success=1);
+    } else {
+        handle_revoked_refs();
+        return (success=0);
+    }    
+}
+
 // Remove value at particular position in the list.
 // @param limit_id : limit ID of order list being amended
 // @param idx : list item to be deleted
 // @return del : deleted Order
 @external
-func remove{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt, idx : felt) -> (del : Order) {
+func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt, idx : felt) -> (del : Order) 
+{
     alloc_locals;
 
     tempvar empty_order: Order* = new Order(
@@ -442,11 +433,9 @@ func remove{
 // Utility function to check idx is not out of bounds.
 // @param idx : index to check
 // @return in_range : 1 if idx in range, 0 otherwise
-func validate_idx{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt, idx : felt) -> (in_range : felt) {
+func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt, idx : felt) -> (in_range : felt) 
+{
     alloc_locals;
     
     let (length) = lengths.read(limit_id);
@@ -464,11 +453,9 @@ func validate_idx{
 
 // Utility function for printing list.
 @view
-func print_list{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (node_loc : felt, idx: felt, first_iter : felt) {
+func print_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (node_loc : felt, idx: felt, first_iter : felt) 
+{
     if (first_iter == 1) {
         %{
             print("Orders:")
@@ -491,11 +478,7 @@ func print_list{
 
 // Utility function for printing order.
 @view
-func print_order{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (order : Order) {
+func print_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order : Order) {
     %{
         print("    ", end="")
         print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
@@ -505,11 +488,7 @@ func print_order{
 
 // Utility function to handle revoked implicit references.
 // @dev tempvars used to handle revoked implict references
-func handle_revoked_refs{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} () {
+func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     tempvar syscall_ptr=syscall_ptr;
     tempvar pedersen_ptr=pedersen_ptr;
     tempvar range_check_ptr=range_check_ptr;

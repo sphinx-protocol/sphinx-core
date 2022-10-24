@@ -34,24 +34,45 @@ func curr_limit_id() -> (id : felt) {
 }
 
 @constructor
-func constructor{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} () {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     curr_limit_id.write(1);
     return ();
 }
 
 // Getter for limit price
 @external
-func get_limit{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt) -> (limit : Limit) {
+func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (limit_id : felt) -> (limit : Limit) 
+{
     let (limit) = limits.read(limit_id);
     return (limit=limit);
+}
+
+// Getter for lowest limit price in the tree
+// @param tree_id : ID of limit tree to be searched
+// @return min : node representation of lowest limit price in the tree
+@external
+func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (tree_id : felt) -> (min : Limit) 
+{
+    tempvar empty_limit: Limit* = new Limit(
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
+    );
+    let (root) = roots.read(tree_id);
+    let (min, _) = find_min(root, [empty_limit]);
+    return (min=min);
+}
+
+// Getter for highest limit price in the tree
+// @param tree_id : ID of limit tree to be searched
+// @return max : node representation of highest limit price in the tree
+@external
+func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (tree_id : felt) -> (max : Limit) 
+{
+    let (root) = roots.read(tree_id);
+    let (max) = find_max(root);
+    return (max=max);
 }
 
 // Insert new limit price into BST.
@@ -60,11 +81,9 @@ func get_limit{
 // @param tree_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
 @external
-func insert{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (price : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) {
+func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (price : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) 
+{
     alloc_locals;
 
     let (id) = curr_limit_id.read();
@@ -101,11 +120,9 @@ func insert{
 // @param tree_id : ID of tree currently being traversed
 // @param market_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
-func insert_helper{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) {
+func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit) 
+{
     alloc_locals;
     let (root_id) = roots.read(tree_id);
     let (root) = limits.read(root_id);
@@ -161,11 +178,9 @@ func insert_helper{
 // @return limit : retrieved limit price (or empty limit if not found)
 // @return parent : parent of retrieved limit price (or empty limit if not found)
 @view
-func find{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (price : felt, tree_id : felt) -> (limit : Limit, parent : Limit) {    
+func find{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (price : felt, tree_id : felt) -> (limit : Limit, parent : Limit) 
+{
     let (root_id) = roots.read(tree_id);
     tempvar empty_limit: Limit* = new Limit(
         id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
@@ -184,11 +199,9 @@ func find{
 // @param parent : parent of current node in traversal of the BST
 // @return limit : retrieved limit price (or empty limit if not found)
 // @return parent : parent of retrieved limit price (or empty limit if not found)
-func find_helper{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (tree_id : felt, price : felt, curr : Limit, parent : Limit) -> (limit : Limit, parent : Limit) {
+func find_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (tree_id : felt, price : felt, curr : Limit, parent : Limit) -> (limit : Limit, parent : Limit) 
+{
     alloc_locals;
 
     if (curr.id == 0) {
@@ -228,11 +241,9 @@ func find_helper{
 // @param market_id : ID of current market
 // @return del : node representation of deleted limit price
 @external
-func delete{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (price : felt, tree_id : felt, market_id : felt) -> (del : Limit) {
+func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (price : felt, tree_id : felt, market_id : felt) -> (del : Limit) 
+{
     alloc_locals;
 
     tempvar empty_limit: Limit* = new Limit(
@@ -295,11 +306,9 @@ func delete{
 // @param parent : parent node to update
 // @param limit : current node to be replaced
 // @param new_id : id of the new node that parent should point to
-func update_parent{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (tree_id : felt, parent : Limit, limit : Limit, new_id : felt) {
+func update_parent{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (tree_id : felt, parent : Limit, limit : Limit, new_id : felt) 
+{
     alloc_locals;
 
     if (parent.id == 0) {
@@ -322,11 +331,9 @@ func update_parent{
 // @param node : current node to update
 // @param left_id : id of new left child
 // @param right_id : id of new right child
-func update_pointers{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (node : Limit, left_id : felt, right_id : felt) {
+func update_pointers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (node : Limit, left_id : felt, right_id : felt) 
+{
     tempvar new_node: Limit* = new Limit(
         id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
         order_len=node.order_len, order_head=node.order_head, order_tail=node.order_tail, tree_id=node.tree_id, market_id=node.market_id
@@ -338,13 +345,12 @@ func update_pointers{
 
 // Helper function to find the lowest limit price within a tree
 // @param root : root of tree to be searched
+// @param parent : parent node of root
 // @return min : node representation of lowest limit price
 // @return parent : parent node of lowest limit price
-func find_min{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (curr : Limit, parent : Limit) -> (min : Limit, parent : Limit) {
+func find_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (curr : Limit, parent : Limit) -> (min : Limit, parent : Limit)
+{
     if (curr.left_id == 0) {
         return (min=curr, parent=parent);
     }
@@ -352,16 +358,27 @@ func find_min{
     return find_min(curr=left, parent=curr);
 }
 
+// Helper function to find the highest limit price within a tree
+// @param root : root of tree to be searched
+// @return min : node representation of highest limit price
+func find_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (root : Limit) -> (max : Limit) 
+{
+    if (curr.right_id == 0) {
+        return (max=curr);
+    }
+    let (right) = limits.read(curr.right_id);
+    return find_min(curr=right);
+}
+
 // Setter function to update details of limit price
 // @param limit : ID of limit price to update
 // @param new_vol : new volume
 // @return success : 1 if successfully inserted, 0 otherwise
 @external
-func update{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit_id : felt, total_vol : felt, order_len : felt, order_head : felt, order_tail : felt ) -> (success : felt) {
+func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
+    (limit_id : felt, total_vol : felt, order_len : felt, order_head : felt, order_tail : felt) -> (success : felt) 
+{
     if (limit_id == 0) {
         return (success=0);
     }
@@ -376,11 +393,9 @@ func update{
 
 // Utility function to handle printing of tree nodes in left to right order.
 @view
-func print_dfs_in_order{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (root : Limit, iter : felt) {
+func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
+    (root : Limit, iter : felt) 
+{
     alloc_locals;
     if (iter == 1) {
         %{ 
@@ -415,11 +430,7 @@ func print_dfs_in_order{
 }
 
 @view
-func print_limit_order{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} (limit : Limit) {
+func print_limit_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
         print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
     %}
@@ -428,11 +439,7 @@ func print_limit_order{
 
 // Utility function to handle revoked implicit references.
 // @dev tempvars used to handle revoked implict references
-func handle_revoked_refs{
-    syscall_ptr: felt*,
-    pedersen_ptr: HashBuiltin*,
-    range_check_ptr,
-} () {
+func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     tempvar syscall_ptr=syscall_ptr;
     tempvar pedersen_ptr=pedersen_ptr;
     tempvar range_check_ptr=range_check_ptr;
