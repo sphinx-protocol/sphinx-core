@@ -2,6 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
+from starkware.cairo.common.math import unsigned_div_rem
 
 // Stores user balances.
 @storage_var
@@ -19,9 +20,9 @@ func order_balances(user : felt, asset : felt) -> (amount : felt) {
 // @param in_account : 1 for account balances, 0 for order balances
 // @return amount : token balance
 @external
-func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
-    (user : felt, asset : felt, in_account : felt) -> (amount : felt) 
-{
+func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, in_account : felt) -> (amount : felt
+) {
     if (in_account == 1) {
         let (amount) = account_balances.read(user, asset);
         return (amount=amount);
@@ -37,9 +38,9 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param in_account : 1 for account balances, 0 for order balances
 // @param amount : new token balance
 @external
-func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
-    (user : felt, asset : felt, in_account : felt, new_amount : felt) 
-{
+func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, in_account : felt, new_amount : felt
+) {
     if (in_account == 1) {
         account_balances.write(user, asset, new_amount);
         return ();
@@ -56,9 +57,9 @@ func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param amount : token balance
 // @return success : 1 if successful, 0 otherwise
 @external
-func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
-    (sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt) 
-{
+func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt
+) {
     let (sender_balance) = get_balance(sender, asset, 1);
     let is_sufficient = is_le(amount, sender_balance);
     let is_positive = is_le(1, amount);
@@ -78,9 +79,9 @@ func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // @param amount : balance to transfer to open order
 // @return success : 1 if successful, 0 otherwise
 @external
-func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
-    (user : felt, asset : felt, amount : felt) -> (success : felt) 
-{
+func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, amount : felt) -> (success : felt
+) {
     let (balance) = get_balance(user, asset, 1);
     let is_sufficient = is_le(amount, balance);
     let is_positive = is_le(1, amount);
@@ -100,9 +101,9 @@ func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param amount : balance to transfer from open order to account balance
 // @return success : 1 if successful, 0 otherwise
 @external
-func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
-    (user : felt, asset : felt, amount : felt) -> (success : felt) 
-{
+func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, amount : felt) -> (success : felt
+) {
     let (locked_balance) = get_balance(user, asset, 0);
     let is_sufficient = is_le(amount, locked_balance);
     let is_positive = is_le(1, amount);
@@ -124,9 +125,11 @@ func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @param amount : size of filled open order, in terms of number of tokens in the quote asset
 // @return success : 1 if successful, 0 otherwise
 @external
-func fill_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
-    (buyer : felt, seller : felt, base_asset : felt, quote_asset : felt, amount : felt, price : felt) -> (success : felt)
-{
+func fill_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    buyer : felt, seller : felt, base_asset : felt, quote_asset : felt, amount : felt, price : felt
+        ) -> (
+    success : felt
+) {
     let (seller_quote_locked_balance) = get_balance(seller, quote_asset, 0);
     let (seller_base_account_balance) = get_balance(seller, base_asset, 1);
     let (buyer_quote_account_balance) = get_balance(seller, quote_asset, 1);
