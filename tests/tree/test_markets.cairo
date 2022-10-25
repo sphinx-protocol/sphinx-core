@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.tree.markets import (
-    curr_market_id, curr_tree_id, create_market, create_bid
+    curr_market_id, curr_tree_id, create_market, create_bid, create_ask
 )
 
 @contract_interface
@@ -50,8 +50,12 @@ func test_markets{
     %{ expect_events({"name": "log_create_market", "data": [1, 1, 2, 0, 0, 123213123123, 788978978998, 123456789]}) %}
     let (new_market) = create_market(base_asset=123213123123, quote_asset=788978978998);
     IBalancesContract.set_balance(balances_contract_address, 123456789, 123213123123, 1, 5000);
+    IBalancesContract.set_balance(balances_contract_address, 666666666, 788978978998, 1, 5000);
+    create_ask(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=94, amount=1000);
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=95, amount=1000);
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=95, amount=200);
+
+
 
     %{ stop_prank_callable() %}
     return ();
