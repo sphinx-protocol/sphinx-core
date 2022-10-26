@@ -381,7 +381,7 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         order_len=order_len, order_head=order_head, order_tail=order_tail, tree_id=limit.tree_id, market_id=limit.market_id
     );
     limits.write(limit_id, [new_limit]);
-    print_limit_order([new_limit]);
+    print_limit([new_limit]);
     return (success=1);
 }
 
@@ -429,9 +429,9 @@ func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 }
 
 @view
-func print_limit_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
+func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
-        print("[limits.cairo] id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
+        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }

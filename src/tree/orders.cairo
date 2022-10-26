@@ -129,6 +129,7 @@ func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         handle_revoked_refs();
 
         // Diagnostics
+        %{ print("Pushed order") %}
         let (head_id) = heads.read(limit_id);
         print_list(head_id, length + 1, 1);
 
@@ -220,20 +221,20 @@ func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (lim
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    // %{ print("Deleted: ") %}
-    // print_order(old_head);
-    // let (head_id) = heads.read(limit_id);
-    // let length_positive = is_le(1, length - 1);
-    // if (length_positive == 1) {
-    //     print_list(head_id, length - 1, 1);
-    //     handle_revoked_refs();
-    // } else {
-    //     %{ 
-    //         print("No orders remaining") 
-    //         print("") 
-    //     %}
-    //     handle_revoked_refs();
-    // }
+    %{ print("Deleted order: ") %}
+    print_order(old_head);
+    let (head_id) = heads.read(limit_id);
+    let length_positive = is_le(1, length - 1);
+    if (length_positive == 1) {
+        print_list(head_id, length - 1, 1);
+        handle_revoked_refs();
+    } else {
+        %{ 
+            print("No orders remaining") 
+            print("") 
+        %}
+        handle_revoked_refs();
+    }
 
     return (del=old_head);
 } 
@@ -334,9 +335,10 @@ func set{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     orders.write(order.id, [new_order]);
 
     // Diagnostics
-    // let (head_id) = heads.read(limit_id);
-    // let (length) = lengths.read(limit_id);
-    // print_list(head_id, length, 1);
+    %{ print("Set order") %}
+    let (head_id) = heads.read(limit_id);
+    let (length) = lengths.read(limit_id);
+    print_list(head_id, length, 1);
 
     return (success=1);
 }
@@ -416,8 +418,9 @@ func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    // let (head_id) = heads.read(limit_id);
-    // print_list(head_id, length + 1, 1);
+    %{ print("Removed order") %}
+    let (head_id) = heads.read(limit_id);
+    print_list(head_id, length + 1, 1);
 
     return (del=removed);
 }
