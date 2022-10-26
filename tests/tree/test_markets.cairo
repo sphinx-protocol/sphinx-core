@@ -33,7 +33,7 @@ func test_markets{
     alloc_locals;
 
     // Start prank - set caller address
-    %{ stop_prank_callable = start_prank(123456789) %}
+    
 
     // Constructor
     curr_market_id.write(1);
@@ -47,16 +47,26 @@ func test_markets{
     %{ ids.limits_contract_address = deploy_contract("./src/tree/limits.cairo").contract_address %}
     %{ ids.balances_contract_address = deploy_contract("./src/tree/balances.cairo").contract_address %}
 
-    %{ expect_events({"name": "log_create_market", "data": [1, 1, 2, 0, 0, 123213123123, 788978978998, 123456789]}) %}
+    %{ stop_prank_callable = start_prank(666666666) %}
+    %{ expect_events({"name": "log_create_market", "data": [1, 1, 2, 0, 0, 123213123123, 788978978998, 666666666]}) %}
     let (new_market) = create_market(base_asset=123213123123, quote_asset=788978978998);
     IBalancesContract.set_balance(balances_contract_address, 123456789, 123213123123, 1, 5000);
     IBalancesContract.set_balance(balances_contract_address, 666666666, 788978978998, 1, 5000);
+
+    %{ expect_events({"name": "log_create_ask", "data": [1, 1, 1, 0, 666666666, 123213123123, 788978978998, 94, 1000]}) %}   
     create_ask(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=94, amount=1000);
+    %{ stop_prank_callable() %}
+
+    %{ stop_prank_callable = start_prank(123456789) %}
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=95, amount=1000);
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, price=95, amount=200);
-
-
-
     %{ stop_prank_callable() %}
+
+    let (buyer_base_balance) = IBalancesContract.get_balance(balances_contract_address, 123456789, 123213123123, 1);
+    let (buyer_quote_locked_balance) = IBalancesContract.get_balance(balances_contract_address, 123456789, 788978978998, 0);
+    let (seller_base_balance) = IBalancesContract.get_balance(balances_contract_address, 666666666, 123213123123, 1);
+    let (seller_quote_balance) = IBalancesContract.get_balance(balances_contract_address, 666666666, 788978978998, 1);
+    %{ print("buyer_base_balance: {}, buyer_quote_locked_balance: {}, seller_base_balance: {}, seller_quote_balance: {}".format(ids.buyer_base_balance, ids.buyer_quote_locked_balance, ids.seller_base_balance, ids.seller_quote_balance)) %}
+
     return ();
 }

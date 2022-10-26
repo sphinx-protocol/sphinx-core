@@ -450,7 +450,7 @@ func print_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 ) {
     if (first_iter == 1) {
         %{
-            print("Orders:")
+            print("[orders.cairo] Orders:")
         %}
         tempvar temp;
     }

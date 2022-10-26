@@ -51,10 +51,12 @@ func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 // @return min : node representation of lowest limit price in the tree
 @external
 func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (min : Limit) {
-    tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
-    );
+    alloc_locals;
+    let empty_limit : Limit* = gen_empty_limit();
     let (root_id) = roots.read(tree_id);
+    if (root_id == 0) {
+        return (min=[empty_limit]);
+    }
     let (root) = limits.read(root_id);
     let (min, _) = find_min(root, [empty_limit]);
     return (min=min);
@@ -65,7 +67,12 @@ func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (t
 // @return max : node representation of highest limit price in the tree
 @external
 func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (max : Limit) {
+    alloc_locals;
     let (root_id) = roots.read(tree_id);
+    let empty_limit: Limit* = gen_empty_limit();
+    if (root_id == 0) {
+        return (max=[empty_limit]);
+    }
     let (root) = limits.read(root_id);
     let (max) = find_max(curr=root);
     return (max=max);
@@ -162,9 +169,7 @@ func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         handle_revoked_refs(); 
     }
 
-    tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
-    );
+    let empty_limit: Limit* = gen_empty_limit();
     return (new_limit=[empty_limit]);
 }
 
@@ -177,10 +182,9 @@ func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func find{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     price : felt, tree_id : felt) -> (limit : Limit, parent : Limit
 ) {
+    alloc_locals;
     let (root_id) = roots.read(tree_id);
-    tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
-    );
+    let empty_limit: Limit* = gen_empty_limit();
     if (root_id == 0) {
         return (limit=[empty_limit], parent=[empty_limit]);
     }
@@ -201,9 +205,7 @@ func find_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     alloc_locals;
 
     if (curr.id == 0) {
-        tempvar empty_limit: Limit* = new Limit(
-            id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
-        );
+        let empty_limit: Limit* = gen_empty_limit();
         handle_revoked_refs();
         return (limit=[empty_limit], parent=[empty_limit]);
     } else {
@@ -242,10 +244,7 @@ func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 ) {
     alloc_locals;
 
-    tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
-    );
-
+    let empty_limit: Limit* = gen_empty_limit();
     let (root_id) = roots.read(tree_id);
     if (root_id == 0) {
         handle_revoked_refs();
@@ -382,7 +381,15 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         order_len=order_len, order_head=order_head, order_tail=order_tail, tree_id=limit.tree_id, market_id=limit.market_id
     );
     limits.write(limit_id, [new_limit]);
+    print_limit_order([new_limit]);
     return (success=1);
+}
+
+func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_limit : Limit*) {
+    tempvar empty_limit: Limit* = new Limit(
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
+    );
+    return (empty_limit=empty_limit);
 }
 
 // Utility function to handle printing of tree nodes in left to right order.
@@ -424,7 +431,7 @@ func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 @view
 func print_limit_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
+        print("[limits.cairo] id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }
