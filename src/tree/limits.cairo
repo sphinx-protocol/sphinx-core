@@ -11,9 +11,9 @@ struct Limit {
     right_id : felt,
     price : felt,
     total_vol : felt,
-    order_len : felt,
-    order_head : felt, 
-    order_tail : felt,
+    length : felt,
+    head_id : felt, 
+    tail_id : felt,
     tree_id : felt,
     market_id : felt,
 }
@@ -91,7 +91,7 @@ func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let (id) = curr_limit_id.read();
     tempvar new_limit: Limit* = new Limit(
-        id=id, left_id=0, right_id=0, price=price, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=tree_id, market_id=market_id
+        id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=tree_id, market_id=market_id
     );
     limits.write(id, [new_limit]);
     curr_limit_id.write(id + 1);
@@ -137,7 +137,7 @@ func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         if (curr.right_id == 0) {
             tempvar new_curr: Limit* = new Limit(
                 id=curr.id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
-                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id, market_id=curr.market_id
+                length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
             );
             limits.write(curr.id, [new_curr]);
             handle_revoked_refs();
@@ -155,7 +155,7 @@ func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
         if (curr.left_id == 0) {
             tempvar new_curr: Limit* = new Limit(
                 id=curr.id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
-                order_len=curr.order_len, order_head=curr.order_head, order_tail=curr.order_tail, tree_id=tree_id, market_id=curr.market_id
+                length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
             );
             limits.write(curr.id, [new_curr]);
             handle_revoked_refs();
@@ -331,7 +331,7 @@ func update_pointers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     tempvar new_node: Limit* = new Limit(
         id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
-        order_len=node.order_len, order_head=node.order_head, order_tail=node.order_tail, tree_id=node.tree_id, market_id=node.market_id
+        length=node.length, head_id=node.head_id, tail_id=node.tail_id, tree_id=node.tree_id, market_id=node.market_id
     );
     limits.write(node.id, [new_node]);
     handle_revoked_refs();
@@ -370,7 +370,7 @@ func find_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 // @return success : 1 if successfully inserted, 0 otherwise
 @external
 func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, total_vol : felt, order_len : felt, order_head : felt, order_tail : felt) -> (success : felt
+    limit_id : felt, total_vol : felt, length : felt, head_id : felt, tail_id : felt) -> (success : felt
 ) {
     if (limit_id == 0) {
         return (success=0);
@@ -378,7 +378,7 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (limit) = limits.read(limit_id);
     tempvar new_limit: Limit* = new Limit(
         id=limit.id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
-        order_len=order_len, order_head=order_head, order_tail=order_tail, tree_id=limit.tree_id, market_id=limit.market_id
+        length=length, head_id=head_id, tail_id=tail_id, tree_id=limit.tree_id, market_id=limit.market_id
     );
     limits.write(limit_id, [new_limit]);
     print_limit([new_limit]);
@@ -387,7 +387,7 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
 func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_limit : Limit*) {
     tempvar empty_limit: Limit* = new Limit(
-        id=0, left_id=0, right_id=0, price=0, total_vol=0, order_len=0, order_head=0, order_tail=0, tree_id=0, market_id=0
+        id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=0, market_id=0
     );
     return (empty_limit=empty_limit);
 }
@@ -416,7 +416,7 @@ func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     }
     %{ 
         print("    ", end="")
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.order_len, ids.root.order_head, ids.root.order_tail, ids.root.tree_id, ids.root.market_id))
+        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.length, ids.root.head_id, ids.root.tail_id, ids.root.tree_id, ids.root.market_id))
     %}
     if (right_exists == 1) {
         let (right) = limits.read(root.right_id);
@@ -431,7 +431,7 @@ func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 @view
 func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, order_len: {}, order_head: {}, order_tail: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.order_len, ids.limit.order_head, ids.limit.order_tail, ids.limit.tree_id, ids.limit.market_id)) 
+        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.length, ids.limit.head_id, ids.limit.tail_id, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }

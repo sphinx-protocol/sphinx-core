@@ -2,7 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.tree.markets import (
-    curr_market_id, curr_tree_id, create_market, create_bid, create_ask, buy
+    curr_market_id, curr_tree_id, create_market, create_bid, create_ask, buy, delete
 )
 
 @contract_interface
@@ -60,6 +60,7 @@ func test_markets{
     %{ stop_prank_callable = start_prank(ids.buyer) %}
     %{ stop_warp = warp(200) %}
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 1000, 1);
+    delete(orders_contract_address, limits_contract_address, balances_contract_address, 1);
     %{ stop_warp = warp(220) %}
     create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 200, 1);
     %{ stop_prank_callable() %}

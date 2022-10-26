@@ -309,7 +309,7 @@ func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 
 // Update order at particular position in the list.
 // @param limit_id : limit ID of order list being amended
-// @param id : position of list to insert new value
+// @param idx : position of list to insert new value
 // @param is_buy : 1 if buy order, 0 if sell order
 // @param price : limit price
 // @param amount : amount of order
@@ -319,15 +319,15 @@ func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @return success : 1 if insertion was successful, 0 otherwise
 @external
 func set{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, id : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
+    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
         ) -> (
     success : felt
 ) {
-    let (in_range) = validate_idx(limit_id, id);
+    let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (success=0);
     }
-    let (order) = orders.read(id);
+    let (order) = orders.read(idx);
     tempvar new_order : Order* = new Order(
         id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
         amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
@@ -369,35 +369,30 @@ func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     }    
 }
 
-// Remove value at particular position in the list.
-// @param limit_id : limit ID of order list being amended
-// @param idx : list item to be deleted
-// @return del : deleted Order
+// Remove order by ID.
+// @param order_id : ID of order being amended
+// @return success : 1 if successful, 0 otherwise
 @external
-func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, idx : felt) -> (del : Order
-) {
+func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
     alloc_locals;
 
+    let (removed) = get_order(order_id);
     tempvar empty_order: Order* = new Order(
         id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
-    );
-    let (in_range) = validate_idx(limit_id, idx);
-    if (in_range == 0) {
-        return (del=[empty_order]);
+    ); 
+    let is_valid = is_le(1, order_id); 
+    if (is_valid == 0) {
+        return (success=0);
     }
-    let (length) = lengths.read(limit_id);
-    if (idx == length - 1) {
-        let (del) = pop(limit_id);
-        return (del=del);
+    
+    if (removed.next_id == 0) {
+        pop(removed.limit_id);
+        return (success=1);
     }
-    if (idx == 0) {
-        let (del) = shift(limit_id);
-        return (del=del);
+    if (removed.prev_id == 0) {
+        shift(removed.limit_id);
+        return (success=1);
     }
-
-    let (removed_order) = get(limit_id, idx);
-    let (removed) = orders.read(removed_order.id);
 
     let (removed_prev) = orders.read(removed.prev_id);
     tempvar updated_removed_prev: Order* = new Order(
@@ -415,14 +410,15 @@ func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     ); 
     orders.write(removed_next.id, [updated_removed_next]);
 
-    lengths.write(limit_id, length - 1);
+    let (length) = lengths.read(removed.limit_id);
+    lengths.write(removed.limit_id, length - 1);
 
     // Diagnostics
     %{ print("Removed order") %}
-    let (head_id) = heads.read(limit_id);
+    let (head_id) = heads.read(removed.limit_id);
     print_list(head_id, length + 1, 1);
 
-    return (del=removed);
+    return (success=1);
 }
 
 // Utility function to check idx is not out of bounds.

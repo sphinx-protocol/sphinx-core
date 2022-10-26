@@ -47,8 +47,8 @@ namespace IOrdersContract {
     // Update filled amount of order.
     func set_filled(id : felt, filled : felt) -> (success : felt) {  
     }
-    // Remove value at particular position in the list.
-    func remove(limit_id : felt, idx : felt) -> (del : Order) {
+    // Remove order by ID.
+    func remove(order_id : felt) -> (success : felt) {
     }
 }
 
@@ -73,7 +73,7 @@ namespace ILimitsContract {
     func delete(price : felt, tree_id : felt, market_id : felt) -> (del : Limit) {
     }
     // Setter function to update details of a limit price.
-    func update(limit_id : felt, total_vol : felt, order_len : felt, order_head : felt, order_tail : felt ) -> (success : felt) {
+    func update(limit_id : felt, total_vol : felt, length : felt, head_id : felt, tail_id : felt ) -> (success : felt) {
     }   
 }
 
@@ -93,12 +93,6 @@ namespace IBalancesContract {
     }
     // Transfer order balance to account balance.
     func transfer_from_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-    // Fill an open bid order.
-    func fill_bid_order(buyer : felt, seller : felt, base_asset : felt, quote_asset : felt, amount : felt, price : felt) -> (success : felt) {
-    }
-    // Fill an open ask order.
-    func fill_ask_order(buyer : felt, seller : felt, base_asset : felt, quote_asset : felt, amount : felt, price : felt) -> (success : felt) {
     }
 }
 
@@ -125,6 +119,21 @@ func curr_market_id() -> (id : felt) {
 // Stores latest tree id.
 @storage_var
 func curr_tree_id() -> (id : felt) {
+}
+
+// Stores IOrdersContract contract address.
+@storage_var
+func orders_addr() -> (addr : felt) {
+}
+
+// Stores ILimitsContract contract address.
+@storage_var
+func limits_addr() -> (addr : felt) {
+}
+
+// Stores IBalancesContract contract address.
+@storage_var
+func balances_addr() -> (addr : felt) {
 }
 
 // Emit create market event.
@@ -163,9 +172,14 @@ func log_sell_filled(id : felt, limit_id : felt, market_id : felt, dt : felt, se
 }
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
+) {
     curr_market_id.write(1);
     curr_tree_id.write(1);
+    orders_addr.write(_orders_addr);
+    limits_addr.write(_limits_addr);
+    balances_addr.write(_balances_addr);
     return ();
 }
 
@@ -235,9 +249,7 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     let (lowest_ask) = IOrdersContract.get_order(orders_addr, market.lowest_ask);
 
     if (market.id == 0) {
-        with_attr error_message("Market does not exist") {
-            assert 0 = 1;
-        }
+        assert 0 = 1;
         return (success=0);
     }
 
@@ -299,7 +311,6 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (caller) = get_caller_address();
     let (account_balance) = IBalancesContract.get_balance(balances_addr, caller, market.base_asset, 1);
     let balance_sufficient = is_le(amount, account_balance);
-    %{ print("[markets.cairo] create_bid_helper > amount: {}, account_balance: {}".format(ids.amount, ids.account_balance)) %}
     if (balance_sufficient == 0) {
         handle_revoked_refs();
         return (success=0);
@@ -310,7 +321,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (dt) = get_block_timestamp();
     let (new_order) = IOrdersContract.push(orders_addr, 1, price, amount, dt, caller, limit.id);
     let (new_head, new_tail) = IOrdersContract.get_head_and_tail(orders_addr, limit.id);
-    let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol + amount, limit.order_len + 1, new_head, new_tail);
+    let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol + amount, limit.length + 1, new_head, new_tail);
     assert update_limit_success = 1;
 
     let (highest_bid) = IOrdersContract.get_order(orders_addr, market.highest_bid);
@@ -350,9 +361,7 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     let (highest_bid) = IOrdersContract.get_order(orders_addr, market.highest_bid);
 
     if (market.id == 0) {
-        with_attr error_message("Market does not exist") {
-            assert 0 = 1;
-        }
+        assert 0 = 1;
         return (success=0);
     }
 
@@ -423,7 +432,7 @@ func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (dt) = get_block_timestamp();
     let (new_order) = IOrdersContract.push(orders_addr, 0, price, amount, dt, caller, limit.id);
     let (new_head, new_tail) = IOrdersContract.get_head_and_tail(orders_addr, limit.id);
-    let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol + amount, limit.order_len + 1, new_head, new_tail);
+    let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol + amount, limit.length + 1, new_head, new_tail);
     assert update_limit_success = 1;
 
     let (lowest_ask) = IOrdersContract.get_order(orders_addr, market.lowest_ask);
@@ -462,8 +471,6 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let (market) = markets.read(market_id);
     let lowest_ask_exists = is_le(1, market.lowest_ask);
-    %{ print("[markets.cairo] buy > amount: {}".format(ids.amount)) %}
-    %{ print("[markets.cairo] buy > lowest_ask_exists: {}".format(ids.lowest_ask_exists)) %}
     if (lowest_ask_exists == 0) {
         let (create_bid_success) = create_bid(orders_addr, limits_addr, balances_addr, market_id, max_price, amount, 0);
         assert create_bid_success = 1;
@@ -478,7 +485,6 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (account_balance) = IBalancesContract.get_balance(balances_addr, caller, market.base_asset, 1);
     let is_sufficient = is_le(base_amount, account_balance);
     let is_positive = is_le(1, amount);
-    %{ print("[markets.cairo] buy > is_sufficient: {}, is_positive: {}, market.id: {}".format(ids.is_sufficient, ids.is_positive, ids.market.id)) %}
     if (is_sufficient * is_positive * market.id == 0) {
         handle_revoked_refs();
         return (success=0);
@@ -487,7 +493,6 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     }
 
     let is_below_max_price = is_le(lowest_ask.price, max_price);
-    %{ print("[markets.cairo] buy > is_below_max_price: {}".format(ids.is_below_max_price)) %}
     if (is_below_max_price == 0) {
         let (create_bid_success) = create_bid(orders_addr, limits_addr, balances_addr, market_id, max_price, amount, 0);
         assert create_bid_success = 1;
@@ -498,17 +503,18 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     }
     
     let (dt) = get_block_timestamp();
-    %{ print("[markets.cairo] buy > dt: {}".format(ids.dt))%}
-    %{ print("[markets.cairo] buy > amount: {}".format(ids.amount))%}
     let is_partial_fill = is_le(amount, lowest_ask.amount - lowest_ask.filled - 1);
-    %{ print("[markets.cairo] buy > is_partial_fill: {}".format(ids.is_partial_fill)) %}
     let (limit) = ILimitsContract.get_limit(limits_addr, lowest_ask.limit_id);
     if (is_partial_fill == 1) {
         // Partial fill of order
         IOrdersContract.set_filled(orders_addr, lowest_ask.id, amount);
-        let (update_balances_success) = IBalancesContract.fill_ask_order(balances_addr, caller, lowest_ask.owner, market.base_asset, market.quote_asset, amount, lowest_ask.price);
-        assert update_balances_success = 1;
-        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - amount, limit.order_len, limit.order_head, limit.order_tail);                
+        let (transfer_balance_success_1) = IBalancesContract.transfer_from_order(balances_addr, lowest_ask.owner, market.quote_asset, amount);
+        let (base_amount, _) = unsigned_div_rem(amount, lowest_ask.price);
+        let (transfer_balance_success_1) = IBalancesContract.transfer_balance(balances_addr, caller, lowest_ask.owner, market.base_asset, base_amount);
+        assert transfer_balance_success_1 = 1;
+        let (transfer_balance_success_2) = IBalancesContract.transfer_balance(balances_addr, lowest_ask.owner, caller, market.quote_asset, amount);
+        assert transfer_balance_success_2 = 1;
+        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - amount, limit.length, limit.head_id, limit.tail_id);                
         assert update_limit_success = 1;
         log_offer_taken.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=amount, total_filled=amount);
         log_buy_filled.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=amount, total_filled=amount);
@@ -517,35 +523,12 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     } else {
         // Fill entire order
         IOrdersContract.set_filled(orders_addr, lowest_ask.id, lowest_ask.amount);
-        IOrdersContract.shift(orders_addr, lowest_ask.limit_id);
-        let (new_head_id, new_tail_id) = IOrdersContract.get_head_and_tail(orders_addr, limit.id);
-        %{ print("[markets.cairo] buy > ILimitsContract.update({}, {}, {}, {}, {})".format(ids.limit.id, ids.limit.total_vol - ids.lowest_ask.amount + ids.lowest_ask.filled, ids.limit.order_len - 1, ids.new_head_id, ids.new_tail_id)) %}
-        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - lowest_ask.amount + lowest_ask.filled, limit.order_len - 1, new_head_id, new_tail_id);                
-        assert update_limit_success = 1;
-
-        %{ print("[markets.cairo] buy > new_head_id: {}".format(ids.new_head_id)) %}
-        if (new_head_id == 0) {
-            ILimitsContract.delete(limits_addr, lowest_ask.price, market.ask_tree_id, market.id);
-            let (next_limit) = ILimitsContract.get_min(limits_addr, market.ask_tree_id);
-            %{ print("[markets.cairo] buy > next_limit.id: {}".format(ids.next_limit.id)) %}
-            if (next_limit.id == 0) {
-                let (update_market_success) = update_inside_quote(market.id, 0, market.highest_bid);
-                assert update_market_success = 1;
-                handle_revoked_refs();
-            } else {
-                let (next_head, _) = IOrdersContract.get_head_and_tail(orders_addr, next_limit.id);
-                let (update_market_success) = update_inside_quote(market.id, next_head, market.highest_bid);
-                assert update_market_success = 1;
-                handle_revoked_refs();
-            }
-            handle_revoked_refs();
-        } else {
-            let (update_market_success) = update_inside_quote(market.id, new_head_id, market.highest_bid);
-            assert update_market_success = 1;
-            handle_revoked_refs();
-        }
-        let (update_account_balance_success) = IBalancesContract.fill_ask_order(balances_addr, caller, lowest_ask.owner, market.base_asset, market.quote_asset, lowest_ask.amount - lowest_ask.filled, lowest_ask.price);
-        assert update_account_balance_success = 1;
+        delete(orders_addr, limits_addr, balances_addr, lowest_ask.id);
+        let (base_amount, _) = unsigned_div_rem(lowest_ask.amount - lowest_ask.filled, lowest_ask.price);
+        let (transfer_balance_success_1) = IBalancesContract.transfer_balance(balances_addr, caller, lowest_ask.owner, market.base_asset, base_amount);
+        assert transfer_balance_success_1 = 1;
+        let (transfer_balance_success_2) = IBalancesContract.transfer_balance(balances_addr, lowest_ask.owner, caller, market.quote_asset, amount);
+        assert transfer_balance_success_2 = 1;
 
         log_offer_taken.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount - lowest_ask.filled, total_filled=amount);
         log_buy_filled.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount - lowest_ask.filled, total_filled=amount);
@@ -575,8 +558,6 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let (market) = markets.read(market_id);
     let highest_bid_exists = is_le(1, market.highest_bid);
-    %{ print("[markets.cairo] sell > amount: {}".format(ids.amount)) %}
-    %{ print("[markets.cairo] sell > highest_bid: {}".format(ids.highest_bid_exists)) %}
     if (highest_bid_exists == 0) {
         let (create_ask_success) = create_ask(orders_addr, limits_addr, balances_addr, market_id, min_price, amount, 0);
         assert create_ask_success = 1;
@@ -590,7 +571,6 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (account_balance) = IBalancesContract.get_balance(balances_addr, caller, market.quote_asset, 1);
     let is_sufficient = is_le(amount, account_balance);
     let is_positive = is_le(1, amount);
-    %{ print("[markets.cairo] sell > is_sufficient: {}, is_positive: {}, market.id: {}".format(ids.is_sufficient, ids.is_positive, ids.market.id)) %}
     if (is_sufficient * is_positive * market.id == 0) {
         handle_revoked_refs();
         return (success=0);
@@ -599,7 +579,6 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     }
 
     let is_above_min_price = is_le(min_price, highest_bid.price);
-    %{ print("[markets.cairo] sell > is_above_min_price: {}".format(ids.is_above_min_price)) %}
     if (is_above_min_price == 0) {
         let (create_ask_success) = create_ask(orders_addr, limits_addr, balances_addr, market_id, min_price, amount, 0);
         assert create_ask_success = 1;
@@ -610,17 +589,18 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     }
     
     let (dt) = get_block_timestamp();
-    %{ print("[markets.cairo] sell > dt: {}".format(ids.dt))%}
-    %{ print("[markets.cairo] sell > amount: {}".format(ids.amount))%}
     let is_partial_fill = is_le(amount, highest_bid.amount - highest_bid.filled - 1);
-    %{ print("[markets.cairo] sell > is_partial_fill: {}".format(ids.is_partial_fill)) %}
     let (limit) = ILimitsContract.get_limit(limits_addr, highest_bid.limit_id);
     if (is_partial_fill == 1) {
         // Partial fill of order
         IOrdersContract.set_filled(orders_addr, highest_bid.id, amount);
-        let (update_balances_success) = IBalancesContract.fill_bid_order(balances_addr, highest_bid.owner, caller, market.base_asset, market.quote_asset, amount, highest_bid.price);
-        assert update_balances_success = 1;
-        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - amount, limit.order_len, limit.order_head, limit.order_tail);                
+        let (transfer_balance_success_1) = IBalancesContract.transfer_from_order(balances_addr, highest_bid.owner, market.base_asset, amount);
+        let (base_amount, _) = unsigned_div_rem(amount, highest_bid.price);
+        let (transfer_balance_success_1) = IBalancesContract.transfer_balance(balances_addr, caller, highest_bid.owner, market.quote_asset, amount);
+        assert transfer_balance_success_1 = 1;
+        let (transfer_balance_success_2) = IBalancesContract.transfer_balance(balances_addr, highest_bid.owner, caller, market.base_asset, base_amount);
+        assert transfer_balance_success_2 = 1;
+        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - amount, limit.length, limit.head_id, limit.tail_id);                
         assert update_limit_success = 1;
         log_bid_taken.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=amount, total_filled=amount);
         log_sell_filled.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=amount, total_filled=amount);
@@ -629,35 +609,12 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     } else {
         // Fill entire order
         IOrdersContract.set_filled(orders_addr, highest_bid.id, highest_bid.amount);
-        IOrdersContract.shift(orders_addr, highest_bid.limit_id);
-        let (new_head_id, new_tail_id) = IOrdersContract.get_head_and_tail(orders_addr, limit.id);
-        %{ print("[markets.cairo] sell > ILimitsContract.update({}, {}, {}, {}, {})".format(ids.limit.id, ids.limit.total_vol - ids.lowest_ask.amount + ids.lowest_ask.filled, ids.limit.order_len - 1, ids.new_head_id, ids.new_tail_id)) %}
-        let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - highest_bid.amount + highest_bid.filled, limit.order_len - 1, new_head_id, new_tail_id);                
-        assert update_limit_success = 1;
-
-        %{ print("[markets.cairo] sell > new_head_id: {}".format(ids.new_head_id)) %}
-        if (new_head_id == 0) {
-            ILimitsContract.delete(limits_addr, highest_bid.price, market.bid_tree_id, market.id);
-            let (next_limit) = ILimitsContract.get_max(limits_addr, market.bid_tree_id);
-            %{ print("[markets.cairo] sell > next_limit.id: {}".format(ids.next_limit.id)) %}
-            if (next_limit.id == 0) {
-                let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, 0);
-                assert update_market_success = 1;
-                handle_revoked_refs();
-            } else {
-                let (next_head, _) = IOrdersContract.get_head_and_tail(orders_addr, next_limit.id);
-                let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, next_head);
-                assert update_market_success = 1;
-                handle_revoked_refs();
-            }
-            handle_revoked_refs();
-        } else {
-            let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, new_head_id);
-            assert update_market_success = 1;
-            handle_revoked_refs();
-        }
-        let (update_account_balance_success) = IBalancesContract.fill_bid_order(balances_addr, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.amount - highest_bid.filled, highest_bid.price);
-        assert update_account_balance_success = 1;
+        delete(orders_addr, limits_addr, balances_addr, highest_bid.id);
+        let (base_amount, _) = unsigned_div_rem(highest_bid.amount - highest_bid.filled, highest_bid.price);
+        let (transfer_balance_success_1) = IBalancesContract.transfer_balance(balances_addr, caller, highest_bid.owner, market.quote_asset, amount);
+        assert transfer_balance_success_1 = 1;
+        let (transfer_balance_success_2) = IBalancesContract.transfer_balance(balances_addr, highest_bid.owner, caller, market.base_asset, base_amount);
+        assert transfer_balance_success_2 = 1;
 
         log_bid_taken.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=amount);
         log_sell_filled.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=amount);
@@ -669,9 +626,69 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     }
 }
 
-// Cancel an order
-func cancel() {
+func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    orders_addr : felt, limits_addr : felt, balances_addr : felt, order_id : felt
+) {
+    alloc_locals;
     
+    let (order) = IOrdersContract.get_order(orders_addr, order_id);
+    let (update_orders_success) = IOrdersContract.remove(orders_addr, order_id);
+    assert update_orders_success = 1;
+    let (new_head_id, new_tail_id) = IOrdersContract.get_head_and_tail(orders_addr, order.limit_id);
+    let (limit) = ILimitsContract.get_limit(limits_addr, order.limit_id);
+    let (update_limit_success) = ILimitsContract.update(limits_addr, limit.id, limit.total_vol - order.amount + order.filled, limit.length - 1, new_head_id, new_tail_id);
+    assert update_limit_success = 1;
+
+    let (market) = markets.read(limit.market_id);
+    let (caller) = get_caller_address();
+
+    if (order.is_buy == 1) {
+        if (new_head_id == 0) {
+            ILimitsContract.delete(limits_addr, limit.price, limit.tree_id, limit.market_id);
+            let (next_limit) = ILimitsContract.get_max(limits_addr, limit.tree_id);
+            if (next_limit.id == 0) {
+                let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, 0);
+                assert update_market_success = 1;
+                handle_revoked_refs();
+            } else {
+                let (next_head, _) = IOrdersContract.get_head_and_tail(orders_addr, next_limit.id);
+                let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, next_head);
+                assert update_market_success = 1;
+                handle_revoked_refs();
+            }
+        } else {
+            let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, new_head_id);
+            assert update_market_success = 1;
+            handle_revoked_refs();     
+        }
+        let (update_balance_success) = IBalancesContract.transfer_from_order(balances_addr, caller, market.base_asset, order.amount);
+        assert update_balance_success = 1;
+        handle_revoked_refs();
+    } else {
+        if (new_head_id == 0) {
+            ILimitsContract.delete(limits_addr, limit.price, limit.tree_id, limit.market_id);
+            let (next_limit) = ILimitsContract.get_max(limits_addr, limit.tree_id);
+            if (next_limit.id == 0) {
+                let (update_market_success) = update_inside_quote(market.id, 0, market.highest_bid);
+                assert update_market_success = 1;
+                handle_revoked_refs();
+            } else {
+                let (next_head, _) = IOrdersContract.get_head_and_tail(orders_addr, next_limit.id);
+                let (update_market_success) = update_inside_quote(market.id, next_head, market.highest_bid);
+                assert update_market_success = 1;
+                handle_revoked_refs();
+            }
+        } else {
+            let (update_market_success) = update_inside_quote(market.id, new_head_id, market.highest_bid);
+            assert update_market_success = 1;
+            handle_revoked_refs();    
+        }
+        let (update_balance_success) = IBalancesContract.transfer_from_order(balances_addr, caller, market.quote_asset, order.amount);
+        assert update_balance_success = 1;
+        handle_revoked_refs();
+    }
+
+    return ();
 }
 
 func print_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (market : Market) {
