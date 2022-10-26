@@ -249,7 +249,6 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     let (lowest_ask) = IOrdersContract.get_order(orders_addr, market.lowest_ask);
 
     if (market.id == 0) {
-        assert 0 = 1;
         return (success=0);
     }
 
@@ -361,7 +360,6 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     let (highest_bid) = IOrdersContract.get_order(orders_addr, market.highest_bid);
 
     if (market.id == 0) {
-        assert 0 = 1;
         return (success=0);
     }
 
