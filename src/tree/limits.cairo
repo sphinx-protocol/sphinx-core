@@ -3,20 +3,8 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
-
-// Data structure representing a limit price.
-struct Limit {
-    id : felt,
-    left_id : felt,
-    right_id : felt,
-    price : felt,
-    total_vol : felt,
-    length : felt,
-    head_id : felt, 
-    tail_id : felt,
-    tree_id : felt,
-    market_id : felt,
-}
+from src.tree.structs import Limit
+// from src.tree.utils import print_limit, print_limit_tree
 
 // Stores details of limit prices as mapping.
 @storage_var
@@ -102,7 +90,7 @@ func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
         // Diagnostics
         // let (new_root) = limits.read(new_limit.id);
-        // print_dfs_in_order(new_root, 1);
+        // print_limit_tree(new_root, 1);
 
         return (new_limit=[new_limit]);
     }
@@ -111,7 +99,7 @@ func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     // Diagnostics
     // let (new_root) = limits.read(root_id);
-    // print_dfs_in_order(new_root, 1);
+    // print_limit_tree(new_root, 1);
 
     return (new_limit=inserted);
 }
@@ -291,7 +279,7 @@ func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     // Diagnostics
     // let (root_id) = roots.read(tree_id);
     // let (new_root) = limits.read(root_id);
-    // print_dfs_in_order(new_root, 1);
+    // print_limit_tree(new_root, 1);
 
     return (del=limit);
 }
@@ -381,7 +369,6 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         length=length, head_id=head_id, tail_id=tail_id, tree_id=limit.tree_id, market_id=limit.market_id
     );
     limits.write(limit_id, [new_limit]);
-    print_limit([new_limit]);
     return (success=1);
 }
 
@@ -392,52 +379,7 @@ func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return (empty_limit=empty_limit);
 }
 
-// Utility function to handle printing of tree nodes in left to right order.
-@view
-func print_dfs_in_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (root : Limit, iter : felt) {
-    alloc_locals;
-    if (iter == 1) {
-        %{ 
-            print("")
-            print("Tree (DFS In Order):") 
-        %}
-        tempvar temp;
-    }
-
-    let left_exists = is_le(1, root.left_id);
-    let right_exists = is_le(1, root.right_id);
-    
-    if (left_exists == 1) {
-        let (left) = limits.read(root.left_id);
-        print_dfs_in_order(left, 0);
-        handle_revoked_refs();
-    } else {
-        handle_revoked_refs();
-    }
-    %{ 
-        print("    ", end="")
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.length, ids.root.head_id, ids.root.tail_id, ids.root.tree_id, ids.root.market_id))
-    %}
-    if (right_exists == 1) {
-        let (right) = limits.read(root.right_id);
-        print_dfs_in_order(right, 0);
-        handle_revoked_refs();
-    } else {
-        handle_revoked_refs();
-    }
-    return ();
-}
-
-@view
-func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
-    %{ 
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.length, ids.limit.head_id, ids.limit.tail_id, ids.limit.tree_id, ids.limit.market_id)) 
-    %}
-    return ();
-}
-
 // Utility function to handle revoked implicit references.
-// @dev tempvars used to handle revoked implict references
 func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     tempvar syscall_ptr=syscall_ptr;
     tempvar pedersen_ptr=pedersen_ptr;

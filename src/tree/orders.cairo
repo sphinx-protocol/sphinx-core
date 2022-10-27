@@ -4,20 +4,8 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
-
-// Data structure representing an order.
-struct Order {
-    id : felt,
-    next_id : felt,
-    prev_id : felt,
-    is_buy : felt, // 1 = buy, 0 = sell
-    price : felt,
-    amount : felt,
-    filled : felt,
-    dt : felt,
-    owner : felt,
-    limit_id : felt,
-}
+from src.tree.structs import Order
+// from src.tree.utils import print_order_list, print_order, print_del_order
 
 // Stores orders in doubly linked lists.
 @storage_var
@@ -107,8 +95,9 @@ func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         handle_revoked_refs();
 
         // Diagnostics
-        let (head_id) = heads.read(limit_id);
-        print_list(head_id, length + 1, 1);
+        // %{ print("Pushed order") %}
+        // let (head_id) = heads.read(limit_id);
+        // print_order_list(head_id, length + 1, 1);
 
         return (new_order=[new_order]);
     } else {
@@ -129,9 +118,9 @@ func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         handle_revoked_refs();
 
         // Diagnostics
-        %{ print("Pushed order") %}
-        let (head_id) = heads.read(limit_id);
-        print_list(head_id, length + 1, 1);
+        // %{ print("Pushed order") %}
+        // let (head_id) = heads.read(limit_id);
+        // print_order_list(head_id, length + 1, 1);
 
         return (new_order=[new_order_updated]);
     }
@@ -179,7 +168,7 @@ func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
     // Diagnostics
     // %{ print("Deleted: ") %}
     // print_order(old_tail);
-    // print_list(head_id, length - 1, 1);
+    // print_order_list(head_id, length - 1, 1);
 
     return (del=old_tail);
 }
@@ -221,20 +210,7 @@ func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (lim
     lengths.write(limit_id, length - 1);
 
     // Diagnostics
-    %{ print("Deleted order: ") %}
-    print_order(old_head);
-    let (head_id) = heads.read(limit_id);
-    let length_positive = is_le(1, length - 1);
-    if (length_positive == 1) {
-        print_list(head_id, length - 1, 1);
-        handle_revoked_refs();
-    } else {
-        %{ 
-            print("No orders remaining") 
-            print("") 
-        %}
-        handle_revoked_refs();
-    }
+    // print_del_order(old_head, limit_id, length);
 
     return (del=old_head);
 } 
@@ -266,15 +242,9 @@ func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
 
     if (less_than_half == 1) {
         let (order) = locate_item_from_head(i=0, idx=idx, curr=head);
-        // Diagnostics
-        // %{ print("Retrieved: ") %}
-        // print_order(order);
         return (order=order);
     } else {
         let (order) = locate_item_from_tail(i=length-1, idx=idx, curr=tail);
-        // Diagnostics
-        // %{ print("Retrieved: ") %}
-        // print_order(order);
         return (order=order);
     }
 }
@@ -317,31 +287,31 @@ func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @param dt : datetime of order entry
 // @param owner : owner of order
 // @return success : 1 if insertion was successful, 0 otherwise
-@external
-func set{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
-        ) -> (
-    success : felt
-) {
-    let (in_range) = validate_idx(limit_id, idx);
-    if (in_range == 0) {
-        return (success=0);
-    }
-    let (order) = orders.read(idx);
-    tempvar new_order : Order* = new Order(
-        id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
-        amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
-    );
-    orders.write(order.id, [new_order]);
+// @external
+// func set{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+//     limit_id : felt, idx : felt, is_buy : felt, price : felt, amount : felt, filled : felt, dt : felt, owner : felt
+//         ) -> (
+//     success : felt
+// ) {
+//     let (in_range) = validate_idx(limit_id, idx);
+//     if (in_range == 0) {
+//         return (success=0);
+//     }
+//     let (order) = orders.read(idx);
+//     tempvar new_order : Order* = new Order(
+//         id=order.id, next_id=order.next_id, prev_id=order.prev_id, is_buy=is_buy, price=price, 
+//         amount=amount, filled=filled, dt=dt, owner=owner, limit_id=limit_id
+//     );
+//     orders.write(order.id, [new_order]);
 
-    // Diagnostics
-    %{ print("Set order") %}
-    let (head_id) = heads.read(limit_id);
-    let (length) = lengths.read(limit_id);
-    print_list(head_id, length, 1);
+//     // Diagnostics
+    // %{ print("Set order") %}
+    // let (head_id) = heads.read(limit_id);
+    // let (length) = lengths.read(limit_id);
+    // print_order_list(head_id, length, 1);
 
-    return (success=1);
-}
+//     return (success=1);
+// }
 
 // Update filled amount of order.
 // @param id : order ID
@@ -414,9 +384,9 @@ func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (or
     lengths.write(removed.limit_id, length - 1);
 
     // Diagnostics
-    %{ print("Removed order") %}
-    let (head_id) = heads.read(removed.limit_id);
-    print_list(head_id, length + 1, 1);
+    // %{ print("Removed order") %}
+    // let (head_id) = heads.read(removed.limit_id);
+    // print_order_list(head_id, length + 1, 1);
 
     return (success=1);
 }
@@ -442,43 +412,7 @@ func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     }
 }
 
-// Utility function for printing list.
-@view
-func print_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    node_loc : felt, idx: felt, first_iter : felt
-) {
-    if (first_iter == 1) {
-        %{
-            print("[orders.cairo] Orders:")
-        %}
-        tempvar temp;
-    }
-    if (idx == 0) {
-        %{
-            print("")
-        %}
-        return ();
-    }
-    let (order) = orders.read(node_loc);
-    %{
-        print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
-    %}
-    return print_list(order.next_id, idx - 1, 0);
-}
-
-// Utility function for printing order.
-@view
-func print_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order : Order) {
-    %{
-        print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
-    %}
-    return ();
-}
-
 // Utility function to handle revoked implicit references.
-// @dev tempvars used to handle revoked implict references
 func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     tempvar syscall_ptr=syscall_ptr;
     tempvar pedersen_ptr=pedersen_ptr;
