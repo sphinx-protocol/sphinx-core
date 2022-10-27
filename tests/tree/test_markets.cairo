@@ -1,9 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.tree.markets import (
-    curr_market_id, curr_tree_id, create_market, create_bid, create_ask, buy
-)
+from src.tree.structs import Market
 
 @contract_interface
 namespace IBalancesContract {
@@ -24,6 +22,22 @@ namespace IBalancesContract {
     }
 }
 
+@contract_interface
+namespace IMarketsContract {
+    // Create a new market for exchanging between two assets.
+    func create_market(base_asset : felt, quote_asset : felt) -> (new_market : Market) {
+    }
+    // Submit a new bid (limit buy order) to a given market.
+    func create_bid(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    }
+    // Submit a new ask (limit sell order) to a given market.
+    func create_ask(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    }
+    // Delete an order and update limits, markets and balances.
+    func delete(order_id : felt) {
+    }
+}
+
 @external
 func test_markets{
     syscall_ptr : felt*,
@@ -39,49 +53,47 @@ func test_markets{
     const base_asset = 123213123123;
     const quote_asset = 788978978998;
 
-    // Constructor
-    curr_market_id.write(1);
-    curr_tree_id.write(1);
-
     // Deploy contracts
-    local orders_contract_address: felt;
-    local limits_contract_address: felt;
-    local balances_contract_address: felt;
-    %{ ids.orders_contract_address = deploy_contract("./src/tree/orders.cairo").contract_address %}
-    %{ ids.limits_contract_address = deploy_contract("./src/tree/limits.cairo").contract_address %}
-    %{ ids.balances_contract_address = deploy_contract("./src/tree/balances.cairo").contract_address %}
+    local orders_addr: felt;
+    local limits_addr: felt;
+    local balances_addr: felt;
+    local markets_addr: felt;
+    %{ ids.orders_addr = deploy_contract("./src/tree/orders.cairo").contract_address %}
+    %{ ids.limits_addr = deploy_contract("./src/tree/limits.cairo").contract_address %}
+    %{ ids.balances_addr = deploy_contract("./src/tree/balances.cairo").contract_address %}
+    %{ ids.markets_addr = deploy_contract("./src/tree/markets.cairo", [ids.orders_addr, ids.limits_addr, ids.balances_addr]).contract_address %}
 
     %{ stop_prank_callable = start_prank(ids.deployer) %}
-    let (new_market) = create_market(base_asset, quote_asset);
-    IBalancesContract.set_balance(balances_contract_address, buyer, base_asset, 1, 5000);
-    IBalancesContract.set_balance(balances_contract_address, seller, quote_asset, 1, 5000);
+    let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset);
+    IBalancesContract.set_balance(balances_addr, buyer, base_asset, 1, 5000);
+    IBalancesContract.set_balance(balances_addr, seller, quote_asset, 1, 5000);
     %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.buyer) %}
+    %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.markets_addr) %}
     %{ stop_warp = warp(200) %}
-    create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 1000, 1);
+    IMarketsContract.create_bid(markets_addr, new_market.id, 1, 1000, 1);
     %{ stop_warp = warp(220) %}
-    create_bid(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 200, 1);
+    IMarketsContract.create_bid(markets_addr, new_market.id, 1, 200, 1);
     %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.seller) %}
+    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.markets_addr) %}
     %{ stop_warp = warp(321) %}
-    create_ask(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 500, 0);
+    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 500, 0);
     %{ stop_warp = warp(335) %}
-    create_ask(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 300, 0);
+    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 300, 0);
     %{ stop_warp = warp(350) %}
-    create_ask(orders_contract_address, limits_contract_address, balances_contract_address, new_market.id, 1, 300, 0);
+    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 300, 0);
     %{ stop_warp %}
     %{ stop_prank_callable() %}
 
-    let (buyer_base_account_balance) = IBalancesContract.get_balance(balances_contract_address, buyer, base_asset, 1);
-    let (buyer_base_locked_balance) = IBalancesContract.get_balance(balances_contract_address, buyer, base_asset, 0);
-    let (buyer_quote_account_balance) = IBalancesContract.get_balance(balances_contract_address, buyer, quote_asset, 1);
-    let (buyer_quote_locked_balance) = IBalancesContract.get_balance(balances_contract_address, buyer, quote_asset, 0);
-    let (seller_base_account_balance) = IBalancesContract.get_balance(balances_contract_address, seller, base_asset, 1);
-    let (seller_base_locked_balance) = IBalancesContract.get_balance(balances_contract_address, seller, base_asset, 0);
-    let (seller_quote_account_balance) = IBalancesContract.get_balance(balances_contract_address, seller, quote_asset, 1);
-    let (seller_quote_locked_balance) = IBalancesContract.get_balance(balances_contract_address, seller, quote_asset, 0);
+    let (buyer_base_account_balance) = IBalancesContract.get_balance(balances_addr, buyer, base_asset, 1);
+    let (buyer_base_locked_balance) = IBalancesContract.get_balance(balances_addr, buyer, base_asset, 0);
+    let (buyer_quote_account_balance) = IBalancesContract.get_balance(balances_addr, buyer, quote_asset, 1);
+    let (buyer_quote_locked_balance) = IBalancesContract.get_balance(balances_addr, buyer, quote_asset, 0);
+    let (seller_base_account_balance) = IBalancesContract.get_balance(balances_addr, seller, base_asset, 1);
+    let (seller_base_locked_balance) = IBalancesContract.get_balance(balances_addr, seller, base_asset, 0);
+    let (seller_quote_account_balance) = IBalancesContract.get_balance(balances_addr, seller, quote_asset, 1);
+    let (seller_quote_locked_balance) = IBalancesContract.get_balance(balances_addr, seller, quote_asset, 0);
 
     %{ print("[test_markets.cairo] buyer_base_account_balance: {}, buyer_base_locked_balance: {}, buyer_quote_account_balance: {}, buyer_quote_locked_balance: {}".format(ids.buyer_base_account_balance, ids.buyer_base_locked_balance, ids.buyer_quote_account_balance, ids.buyer_quote_locked_balance)) %}
     %{ print("[test_markets.cairo] seller_base_account_balance: {}, seller_base_locked_balance: {}, seller_quote_account_balance: {}, seller_quote_locked_balance: {}".format(ids.seller_base_account_balance, ids.seller_base_locked_balance, ids.seller_quote_account_balance, ids.seller_quote_locked_balance)) %}
