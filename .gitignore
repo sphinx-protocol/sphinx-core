@@ -2,3 +2,7 @@ cairo_venv
 tests/python/__pycache__
 tests/.pytest_cache
 js
+.env
+deployments.json
+build
+notes
