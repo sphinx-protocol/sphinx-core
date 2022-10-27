@@ -5,6 +5,15 @@ protostar_version = "0.4.1"
 libs_path = "lib"
 
 ["protostar.contracts"]
-main = [
-    "src/main.cairo",
+orders = [
+    "src/tree/orders.cairo",
+]
+limits = [
+    "src/tree/limits.cairo",
+]
+balances = [
+    "src/tree/balances.cairo",
+]
+markets = [
+    "src/tree/markets.cairo",
 ]
