@@ -3,27 +3,59 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
+from starkware.starknet.common.syscalls import get_caller_address
 from src.tree.structs import Limit
-// from src.tree.utils import print_limit, print_limit_tree
+// from src.tree.print import print_limit, print_limit_tree
 
 // Stores details of limit prices as mapping.
 @storage_var
 func limits(id : felt) -> (limit : Limit) {
 }
-
 // Stores roots of binary search trees.
 @storage_var
 func roots(tree_id : felt) -> (id : felt) {
 }
-
 // Stores latest limit id.
 @storage_var
 func curr_limit_id() -> (id : felt) {
 }
+// Stores contract address of contract owner.
+@storage_var
+func owner_addr() -> (id : felt) {
+}
+// Stores contract address of MarketsContract.
+@storage_var
+func markets_addr() -> (id : felt) {
+}
+// 1 if markets_addr has been set, 0 otherwise
+@storage_var
+func is_markets_addr_set() -> (bool : felt) {
+}
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    _owner_addr : felt
+) {
     curr_limit_id.write(1);
+    owner_addr.write(_owner_addr);
+    return ();
+}
+
+// Set MarketsContract address.
+// @dev Can only be called by contract owner and is write once.
+@external
+func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
+    let (caller) = get_caller_address();
+    let (_owner_addr) = owner_addr.read();
+    assert caller = _owner_addr;
+    let (is_set) = is_markets_addr_set.read();
+    if (is_set == 0) {
+        markets_addr.write(_markets_addr);
+        is_markets_addr_set.write(1);
+        handle_revoked_refs();
+    } else {
+        handle_revoked_refs();
+    }
     return ();
 }
 
@@ -73,8 +105,8 @@ func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (t
 // @return success : 1 if insertion was successful, 0 otherwise
 @external
 func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    price : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit
-) {
+    price : felt, tree_id : felt, market_id : felt
+) -> (new_limit : Limit) {
     alloc_locals;
 
     let (id) = curr_limit_id.read();
@@ -112,8 +144,8 @@ func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 // @param market_id : ID of current market
 // @return success : 1 if insertion was successful, 0 otherwise
 func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt) -> (new_limit : Limit
-) {
+    price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt
+) -> (new_limit : Limit) {
     alloc_locals;
     let (root_id) = roots.read(tree_id);
     let (root) = limits.read(root_id);
@@ -168,8 +200,8 @@ func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 // @return parent : parent of retrieved limit price (or empty limit if not found)
 @view
 func find{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    price : felt, tree_id : felt) -> (limit : Limit, parent : Limit
-) {
+    price : felt, tree_id : felt
+) -> (limit : Limit, parent : Limit) {
     alloc_locals;
     let (root_id) = roots.read(tree_id);
     let empty_limit: Limit* = gen_empty_limit();
@@ -188,8 +220,8 @@ func find{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 // @return limit : retrieved limit price (or empty limit if not found)
 // @return parent : parent of retrieved limit price (or empty limit if not found)
 func find_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt, price : felt, curr : Limit, parent : Limit) -> (limit : Limit, parent : Limit
-) {
+    tree_id : felt, price : felt, curr : Limit, parent : Limit
+) -> (limit : Limit, parent : Limit) {
     alloc_locals;
 
     if (curr.id == 0) {
@@ -228,8 +260,8 @@ func find_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @return del : node representation of deleted limit price
 @external
 func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    price : felt, tree_id : felt, market_id : felt) -> (del : Limit
-) {
+    price : felt, tree_id : felt, market_id : felt
+) -> (del : Limit) {
     alloc_locals;
 
     let empty_limit: Limit* = gen_empty_limit();
@@ -332,8 +364,8 @@ func update_pointers{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @return min : node representation of lowest limit price
 // @return parent : parent node of lowest limit price
 func find_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    curr : Limit, parent : Limit) -> (min : Limit, parent : Limit
-) {
+    curr : Limit, parent : Limit
+) -> (min : Limit, parent : Limit) {
     if (curr.left_id == 0) {
         return (min=curr, parent=parent);
     }
@@ -377,6 +409,24 @@ func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=0, market_id=0
     );
     return (empty_limit=empty_limit);
+}
+
+// Utility function to check that caller is either contract owner or markets contract.
+@view
+func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+    let (caller) = get_caller_address();
+    let (_owner_addr) = owner_addr.read();
+    let (_markets_addr) = markets_addr.read();
+    if (caller == _owner_addr) {
+        return ();
+    }
+    if (caller == _markets_addr) {
+        return ();
+    }
+    with_attr error_message("Caller does not have permission to call this function.") {
+        assert 1 = 0;
+    }
+    return ();
 }
 
 // Utility function to handle revoked implicit references.

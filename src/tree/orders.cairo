@@ -4,45 +4,76 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
+from starkware.starknet.common.syscalls import get_caller_address
 from src.tree.structs import Order
-// from src.tree.utils import print_order_list, print_order, print_del_order
+// from src.tree.print import print_order_list, print_order, print_del_order
 
 // Stores orders in doubly linked lists.
 @storage_var
 func orders(id : felt) -> (order : Order) {
 }
-
 // Stores heads of doubly linked lists.
 @storage_var
 func heads(limit_id : felt) -> (id : felt) {
 }
-
 // Stores tails of doubly linked lists.
 @storage_var
 func tails(limit_id : felt) -> (id : felt) {
 }
-
 // Stores lengths of doubly linked lists.
 @storage_var
 func lengths(limit_id : felt) -> (len : felt) {
 }
-
 // Stores latest order id.
 @storage_var
 func curr_order_id() -> (id : felt) {
 }
+// Stores contract address of contract owner.
+@storage_var
+func owner_addr() -> (id : felt) {
+}
+// Stores contract address of MarketsContract.
+@storage_var
+func markets_addr() -> (id : felt) {
+}
+// 1 if markets_addr has been set, 0 otherwise
+@storage_var
+func is_markets_addr_set() -> (bool : felt) {
+}
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    _owner_addr : felt
+) {
     curr_order_id.write(1);
+    owner_addr.write(_owner_addr);
+    return ();
+}
+
+// Set MarketsContract address.
+// @dev Can only be called by contract owner and is write once.
+@external
+func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
+    let (caller) = get_caller_address();
+    let (_owner_addr) = owner_addr.read();
+    assert caller = _owner_addr;
+    let (is_set) = is_markets_addr_set.read();
+    if (is_set == 0) {
+        markets_addr.write(_markets_addr);
+        is_markets_addr_set.write(1);
+        handle_revoked_refs();
+    } else {
+        handle_revoked_refs();
+    }
     return ();
 }
 
 // Getter for head ID and tail ID.
 @external
 func get_head_and_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt) -> (head_id : felt, tail_id : felt
-) {
+    limit_id : felt
+) -> (head_id : felt, tail_id : felt) {
+    check_permissions();
     let (head_id) = heads.read(limit_id);
     let (tail_id) = tails.read(limit_id);
     return (head_id=head_id, tail_id=tail_id);
@@ -50,9 +81,8 @@ func get_head_and_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 
 // Getter for list length.
 @external
-func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt) -> (len : felt
-) {
+func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (len : felt) {
+    check_permissions();
     let (len) = lengths.read(limit_id);
     return (len=len);
 }
@@ -63,6 +93,7 @@ func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @return order : returned order
 @external
 func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (id : felt) -> (order : Order) {
+    check_permissions();
     let (order) = orders.read(id);
     return (order=order);
 }
@@ -76,10 +107,11 @@ func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 // @param limit_id : ID of limit price corresponding to order
 @external
 func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order 
-) {
+    is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt
+) -> (new_order : Order) {
     alloc_locals;
 
+    check_permissions();
     let (id) = curr_order_id.read();
     tempvar new_order: Order* = new Order(
         id=id, next_id=0, prev_id=0, is_buy=is_buy, price=price, amount=amount, filled=0, dt=dt, owner=owner, limit_id=limit_id
@@ -133,6 +165,7 @@ func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (del : Order) {
     alloc_locals;
     
+    check_permissions();
     let (length) = lengths.read(limit_id);
     tempvar empty_order: Order* = new Order(
         id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
@@ -180,6 +213,7 @@ func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
 func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (del : Order) {
     alloc_locals;
 
+    check_permissions();
     let (length) = lengths.read(limit_id);
     tempvar empty_order: Order* = new Order(
         id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
@@ -223,6 +257,7 @@ func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (lim
 func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt, idx : felt) -> (order : Order) {
     alloc_locals;
     
+    check_permissions();
     tempvar empty_order: Order* = new Order(
         id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
@@ -254,8 +289,8 @@ func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
 // @param idx : list position to be found
 // @param curr : order in current iteration of the list
 func locate_item_from_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    i : felt, idx : felt, curr : Order) -> (order : Order
-) {
+    i : felt, idx : felt, curr : Order
+) -> (order : Order) {
     if (i == idx) {
         return (order=curr);
     }
@@ -268,8 +303,8 @@ func locate_item_from_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @param idx : list position to be found
 // @param curr : order in current iteration of the list
 func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    i : felt, idx : felt, curr : Order) -> (order : Order
-) {
+    i : felt, idx : felt, curr : Order
+) -> (order : Order) {
     if (i == idx) {
         return (order=curr);
     }
@@ -319,8 +354,9 @@ func locate_item_from_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range
 // @return success : 1 if update was successful, 0 otherwise
 @external
 func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    id : felt, filled : felt) -> (success : felt
-) {
+    id : felt, filled : felt
+) -> (success : felt) {
+    check_permissions();
     let (order) = orders.read(id);
     let is_valid = is_le(filled, order.amount);
     let is_incremental = is_le(order.filled, filled - 1);
@@ -345,7 +381,8 @@ func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 @external
 func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
     alloc_locals;
-
+    
+    check_permissions();
     let (removed) = get_order(order_id);
     tempvar empty_order: Order* = new Order(
         id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
@@ -395,8 +432,8 @@ func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (or
 // @param idx : index to check
 // @return in_range : 1 if idx in range, 0 otherwise
 func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, idx : felt) -> (in_range : felt
-) {
+    limit_id : felt, idx : felt
+) -> (in_range : felt) {
     alloc_locals;
     
     let (length) = lengths.read(limit_id);
@@ -410,6 +447,24 @@ func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         handle_revoked_refs();
         return (in_range=1);
     }
+}
+
+// Utility function to check that caller is either contract owner or markets contract.
+@view
+func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+    let (caller) = get_caller_address();
+    let (_owner_addr) = owner_addr.read();
+    let (_markets_addr) = markets_addr.read();
+    if (caller == _owner_addr) {
+        return ();
+    }
+    if (caller == _markets_addr) {
+        return ();
+    }
+    with_attr error_message("Caller does not have permission to call this function.") {
+        assert 1 = 0;
+    }
+    return ();
 }
 
 // Utility function to handle revoked implicit references.
