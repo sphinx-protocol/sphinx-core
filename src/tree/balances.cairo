@@ -21,8 +21,8 @@ func order_balances(user : felt, asset : felt) -> (amount : felt) {
 // @return amount : token balance
 @view
 func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, asset : felt, in_account : felt) -> (amount : felt
-) {
+    user : felt, asset : felt, in_account : felt
+) -> (amount : felt) {
     if (in_account == 1) {
         let (amount) = account_balances.read(user, asset);
         return (amount=amount);
@@ -58,8 +58,8 @@ func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt
-) {
+    sender : felt, recipient : felt, asset : felt, amount : felt
+) -> (success : felt) {
     let (sender_balance) = get_balance(sender, asset, 1);
     let is_sufficient = is_le(amount, sender_balance);
     let is_positive = is_le(1, amount);
@@ -80,8 +80,8 @@ func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, asset : felt, amount : felt) -> (success : felt
-) {
+    user : felt, asset : felt, amount : felt
+) -> (success : felt) {
     let (balance) = get_balance(user, asset, 1);
     let is_sufficient = is_le(amount, balance);
     let is_positive = is_le(1, amount);
@@ -104,8 +104,8 @@ func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, asset : felt, amount : felt) -> (success : felt
-) {
+    user : felt, asset : felt, amount : felt
+) -> (success : felt) {
     let (locked_balance) = get_balance(user, asset, 0);
     let is_sufficient = is_le(amount, locked_balance);
     let is_positive = is_le(1, amount);
