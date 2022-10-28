@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.tree.structs import Order
+from src.dex.structs import Order
 
 @contract_interface
 namespace IOrdersContract {
@@ -40,7 +40,7 @@ func test_orders{
     const markets_addr = 7878787878;
 
     local orders_addr: felt;
-    %{ ids.orders_addr = deploy_contract("./src/tree/orders.cairo", [ids.owner_addr]).contract_address %}
+    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner_addr]).contract_address %}
 
     %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.orders_addr) %}
     IOrdersContract.set_markets_addr(orders_addr, markets_addr);

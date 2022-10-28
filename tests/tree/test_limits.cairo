@@ -1,7 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.tree.structs import Limit
+from src.dex.structs import Limit
 
 @contract_interface
 namespace ILimitsContract {
@@ -40,7 +40,7 @@ func test_limits{
     const markets_addr = 7878787878;
 
     local limits_addr: felt;
-    %{ ids.limits_addr = deploy_contract("./src/tree/limits.cairo", [ids.owner_addr]).contract_address %}
+    %{ ids.limits_addr = deploy_contract("./src/dex/limits.cairo", [ids.owner_addr]).contract_address %}
 
     %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.limits_addr) %}
     ILimitsContract.set_markets_addr(limits_addr, markets_addr);

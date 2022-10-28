@@ -6,8 +6,8 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.starknet.common.syscalls import get_block_timestamp
-from src.tree.structs import Order, Limit, Market
-from src.tree.events import (
+from src.dex.structs import Order, Limit, Market
+from src.dex.events import (
     log_create_market, log_create_bid, log_create_ask, log_bid_taken, log_offer_taken, log_buy_filled, log_sell_filled, log_delete_order
 )
 
@@ -78,48 +78,51 @@ namespace IBalancesContract {
 @storage_var
 func markets(id : felt) -> (market : Market) {
 }
-
 // Stores on-chain mapping of asset addresses to market id.
 @storage_var
 func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
 }
-
 // Stores pointers to bid and ask limit trees.
 @storage_var
 func trees(id : felt) -> (root_id : felt) {
 }
-
 // Stores latest market id.
 @storage_var
 func curr_market_id() -> (id : felt) {
 }
-
 // Stores latest tree id.
 @storage_var
 func curr_tree_id() -> (id : felt) {
 }
-
 // Stores IOrdersContract contract address.
 @storage_var
 func orders_addr() -> (addr : felt) {
 }
-
 // Stores ILimitsContract contract address.
 @storage_var
 func limits_addr() -> (addr : felt) {
 }
-
 // Stores IBalancesContract contract address.
 @storage_var
 func balances_addr() -> (addr : felt) {
 }
+// Stores contract address of contract owner.
+@storage_var
+func owner_addr() -> (id : felt) {
+}
+// Stores contract address of GatewayContract.
+@storage_var
+func gateway_addr() -> (id : felt) {
+}
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
+    _owner_addr : felt, _gateway_addr : felt, _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
 ) {
     curr_market_id.write(1);
     curr_tree_id.write(1);
+    owner_addr.write(_owner_addr);
+    gateway_addr.write(_gateway_addr);
     orders_addr.write(_orders_addr);
     limits_addr.write(_limits_addr);
     balances_addr.write(_balances_addr);
@@ -157,6 +160,7 @@ func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     base_asset : felt, quote_asset : felt
 ) -> (new_market : Market) {
     alloc_locals;
+    check_permissions();
     
     let (market_id) = curr_market_id.read();
     let (tree_id) = curr_tree_id.read();
@@ -207,6 +211,7 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
+    check_permissions();
 
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -323,6 +328,7 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
+    check_permissions();
 
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -436,6 +442,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt, max_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
+    check_permissions();
 
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -523,6 +530,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt, min_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
+    check_permissions();
 
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -550,7 +558,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         handle_revoked_refs();
     }
 
-    let (highest_bid) = IOrdersContract.get_order(_orders_addr, market.highest_bid)
+    let (highest_bid) = IOrdersContract.get_order(_orders_addr, market.highest_bid);
     let is_above_min_price = is_le(min_price, highest_bid.price);
     if (is_above_min_price == 0) {
         let (create_ask_success) = create_ask(market_id, min_price, amount, 0);
@@ -606,6 +614,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 @external
 func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
     alloc_locals;
+    check_permissions();
     
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -678,6 +687,27 @@ func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (or
     let (dt) = get_block_timestamp();
     log_delete_order.emit(order.id, limit.id, market.id, dt, order.owner, market.base_asset, market.quote_asset, order.price, order.amount, order.filled);
     return (success=1);
+}
+
+// Utility function to check that caller is either contract owner or markets contract.
+@view
+func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
+    let (caller) = get_caller_address();
+    let (_owner_addr) = owner_addr.read();
+    let (_gateway_addr) = gateway_addr.read();
+    %{ print("caller: {}, owner_addr: {}, gateway_addr: {}".format(ids.caller, ids._owner_addr, ids._gateway_addr)) %}
+    if (caller == _owner_addr) {
+        %{ print("caller == _owner_addr") %}
+        return ();
+    }
+    if (caller == _gateway_addr) {
+        %{ print("caller == _gateway_addr") %}
+        return ();
+    }
+    with_attr error_message("Caller does not have permission to call this function.") {
+        assert 1 = 0;
+    }
+    return ();
 }
 
 // Utility function to handle revoked implicit references.

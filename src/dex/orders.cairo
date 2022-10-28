@@ -5,8 +5,8 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
-from src.tree.structs import Order
-// from src.tree.print import print_order_list, print_order, print_del_order
+from src.dex.structs import Order
+// from src.dex.print import print_order_list, print_order, print_del_order
 
 // Stores orders in doubly linked lists.
 @storage_var

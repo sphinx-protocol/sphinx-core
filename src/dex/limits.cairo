@@ -4,8 +4,8 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
-from src.tree.structs import Limit
-// from src.tree.print import print_limit, print_limit_tree
+from src.dex.structs import Limit
+// from src.dex.print import print_limit, print_limit_tree
 
 // Stores details of limit prices as mapping.
 @storage_var
@@ -60,7 +60,7 @@ func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 }
 
 // Getter for limit price
-@external
+@view
 func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (limit : Limit) {
     let (limit) = limits.read(limit_id);
     return (limit=limit);
@@ -69,7 +69,7 @@ func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 // Getter for lowest limit price in the tree
 // @param tree_id : ID of limit tree to be searched
 // @return min : node representation of lowest limit price in the tree
-@external
+@view
 func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (min : Limit) {
     alloc_locals;
     let empty_limit : Limit* = gen_empty_limit();
@@ -85,7 +85,7 @@ func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (t
 // Getter for highest limit price in the tree
 // @param tree_id : ID of limit tree to be searched
 // @return max : node representation of highest limit price in the tree
-@external
+@view
 func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (max : Limit) {
     alloc_locals;
     let (root_id) = roots.read(tree_id);
@@ -108,7 +108,8 @@ func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     price : felt, tree_id : felt, market_id : felt
 ) -> (new_limit : Limit) {
     alloc_locals;
-
+    check_permissions();
+    
     let (id) = curr_limit_id.read();
     tempvar new_limit: Limit* = new Limit(
         id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=tree_id, market_id=market_id
@@ -263,6 +264,7 @@ func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     price : felt, tree_id : felt, market_id : felt
 ) -> (del : Limit) {
     alloc_locals;
+    check_permissions();
 
     let empty_limit: Limit* = gen_empty_limit();
     let (root_id) = roots.read(tree_id);
@@ -392,6 +394,7 @@ func find_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt, total_vol : felt, length : felt, head_id : felt, tail_id : felt) -> (success : felt
 ) {
+    check_permissions();
     if (limit_id == 0) {
         return (success=0);
     }
@@ -404,6 +407,7 @@ func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     return (success=1);
 }
 
+// Helper function to generate an empty limit struct.
 func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_limit : Limit*) {
     tempvar empty_limit: Limit* = new Limit(
         id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=0, market_id=0
