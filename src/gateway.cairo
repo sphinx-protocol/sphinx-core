@@ -11,7 +11,16 @@ from src.dex.structs import Market, User
 from src.dex.events import log_create_bid
 
 const MAX_FELT = 7237005577332262320683916064616567226037794236132864326206141556383157321729; // 2^252 + 17 x 2^192 + 1
+const ETH_GOERLI_CHAIN_ID = 1;
 const STARKNET_GOERLI_CHAIN_ID = 2;
+
+@contract_interface
+namespace IL2EthRemoteCoreContract {
+    // Handle request from L1 EthRemoteCore contract to withdraw assets from DEX.
+    func confirm_remote_withdraw(user_address: felt, token_address: felt, amount: felt) {
+    }
+}
+
 
 @contract_interface
 namespace IMarketsContract {
@@ -253,8 +262,14 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    withdraw_helper(user, chain_id, asset, amount, _l2_eth_remote_core_addr);
-    // Call remote_withdraw()
+    if (chain_id == ETH_GOERLI_CHAIN_ID) {
+        withdraw_helper(user, chain_id, asset, amount, _l2_eth_remote_core_addr);
+        IL2EthRemoteCoreContract.confirm_remote_withdraw(_l2_eth_remote_core_addr, user, asset, amount);
+    } else {
+        with_attr error_message("Chain ID not valid") {
+            assert 1 = 0;
+        }
+    }
     return ();
 }
 
