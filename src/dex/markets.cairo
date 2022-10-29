@@ -7,7 +7,7 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.starknet.common.syscalls import get_block_timestamp
 from lib.openzeppelin.access.ownable.library import Ownable
-from src.dex.structs import Order, Limit, Market
+from src.dex.structs import User, Order, Limit, Market
 from src.dex.events import (
     log_create_market, log_create_bid, log_create_ask, log_bid_taken, log_offer_taken, log_buy_filled, log_sell_filled, log_delete_order
 )
@@ -21,7 +21,7 @@ namespace IOrdersContract {
     func get_order(id : felt) -> (order : Order) {
     }
     // Insert new order to the list.
-    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
+    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : User, limit_id : felt) -> (new_order : Order) {
     }
     // Retrieve order at particular position in the list.
     func get(limit_id : felt, idx : felt) -> (order : Order) {
@@ -59,19 +59,19 @@ namespace ILimitsContract {
 @contract_interface
 namespace IBalancesContract {
     // Getter for user balances
-    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
+    func get_balance(user : User, asset : felt, in_account : felt) -> (amount : felt) {
     }
     // Setter for user balances
-    func set_balance(user : felt, asset : felt, in_account : felt, new_amount : felt) {
+    func set_balance(user : User, asset : felt, in_account : felt, new_amount : felt) {
     }
     // Transfer balance from one user to another.
-    func transfer_balance(sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt) {
+    func transfer_balance(sender : User, recipient : User, asset : felt, amount : felt) -> (success : felt) {
     }
     // Transfer account balance to order balance.
-    func transfer_to_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
+    func transfer_to_order(user : User, asset : felt, amount : felt) -> (success : felt) {
     }
     // Transfer order balance to account balance.
-    func transfer_from_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
+    func transfer_from_order(user : User, asset : felt, amount : felt) -> (success : felt) {
     }
 }
 
@@ -211,7 +211,7 @@ func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @return success : 1 if successfully created bid, 0 otherwise
 @external
 func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
+    caller : User, market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
     // check_permissions();
@@ -276,7 +276,7 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created bid, 0 otherwise
 func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+    caller : User, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
 
@@ -329,7 +329,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @return success : 1 if successfully created ask, 0 otherwise
 @external
 func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
+    caller : User, market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -393,7 +393,7 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created bid, 0 otherwise
 func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+    caller : User, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
     let (_orders_addr) = orders_addr.read();
@@ -444,7 +444,7 @@ func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @return success : 1 if successfully created bid, 0 otherwise
 @external
 func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market_id : felt, max_price : felt, amount : felt
+    caller : User, market_id : felt, max_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -532,7 +532,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 // @return success : 1 if successfully created ask, 0 otherwise
 @external
 func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, market_id : felt, min_price : felt, amount : felt
+    caller : User, market_id : felt, min_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -618,7 +618,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 // @param order_id : ID of order
 @external
 func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    caller : felt, order_id : felt
+    caller : User, order_id : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();

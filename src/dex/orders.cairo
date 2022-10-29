@@ -5,9 +5,8 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
-from src.dex.structs import Order
+from src.dex.structs import Order, User
 from lib.openzeppelin.access.ownable.library import Ownable
-// from src.dex.print import print_order_list, print_order, print_del_order
 
 // Stores orders in doubly linked lists.
 @storage_var
@@ -95,11 +94,11 @@ func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 // @param price : limit price
 // @param amount : amount of order
 // @param dt : datetime of order entry
-// @param owner : owner of order
+// @param owner : owner of order (User struct)
 // @param limit_id : ID of limit price corresponding to order
 @external
 func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt
+    is_buy : felt, price : felt, amount : felt, dt : felt, owner : User, limit_id : felt
 ) -> (new_order : Order) {
     alloc_locals;
     check_permissions();
@@ -159,9 +158,7 @@ func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
     check_permissions();
     
     let (length) = lengths.read(limit_id);
-    tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
-    );
+    let empty_order : Order* = gen_empty_order();
     if (length == 0) {
         return (del=[empty_order]);
     }
@@ -207,9 +204,7 @@ func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (lim
     check_permissions();
 
     let (length) = lengths.read(limit_id);
-    tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
-    );
+    let empty_order : Order* = gen_empty_order();
     if (length == 0) {
         return (del=[empty_order]);
     }
@@ -250,9 +245,7 @@ func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit
     alloc_locals;
     check_permissions();
     
-    tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
-    );
+    let empty_order : Order* = gen_empty_order();
     let (in_range) = validate_idx(limit_id, idx);
     if (in_range == 0) {
         return (order=[empty_order]);
@@ -376,9 +369,7 @@ func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (or
     check_permissions();
     
     let (removed) = get_order(order_id);
-    tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
-    ); 
+    let empty_order : Order* = gen_empty_order();
     let is_valid = is_le(1, order_id); 
     if (is_valid == 0) {
         return (success=0);
@@ -439,6 +430,15 @@ func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
         handle_revoked_refs();
         return (in_range=1);
     }
+}
+
+// Utility function to generate an empty order.
+func gen_empty_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_order : Order*) {
+    tempvar empty_user: User* = new User(addr=0, chain_id=0);
+    tempvar empty_order: Order* = new Order(
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=[empty_user], limit_id=0
+    );
+    return (empty_order=empty_order);
 }
 
 // Utility function to check that caller is either contract owner or markets contract.

@@ -1,8 +1,8 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.dex.structs import Order
 from lib.openzeppelin.access.ownable.library import Ownable
+from src.dex.structs import Order, User
 
 @contract_interface
 namespace IOrdersContract {
@@ -16,7 +16,7 @@ namespace IOrdersContract {
     func get_order(id : felt) -> (order : Order) {
     }
     // Insert new order to the list.
-    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
+    func push(is_buy : felt, price : felt, amount : felt, dt : felt, owner : User, limit_id : felt) -> (new_order : Order) {
     }
     // Retrieve order at particular position in the list.
     func get(limit_id : felt, idx : felt) -> (order : Order) {
@@ -38,6 +38,7 @@ func test_orders{
     alloc_locals;
 
     const owner = 456456456;
+    tempvar user : User* = new User(addr=456456456, chain_id=1);
     const markets_addr = 7878787878;
 
     local orders_addr: felt;
@@ -48,11 +49,11 @@ func test_orders{
     %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.markets_addr, target_contract_address=ids.orders_addr) %}
-    IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
-    IOrdersContract.push(orders_addr, is_buy=0, price=24, amount=500, dt=1666091888, owner=456789, limit_id=2);
-    IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=750, dt=1666091950, owner=789123, limit_id=1);
+    IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=1000, dt=1666091715, owner=[user], limit_id=1);
+    IOrdersContract.push(orders_addr, is_buy=0, price=24, amount=500, dt=1666091888, owner=[user], limit_id=2);
+    IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=750, dt=1666091950, owner=[user], limit_id=1);
 
-    IOrdersContract.push(orders_addr, is_buy=1, price=24, amount=400, dt=1666092048, owner=123456, limit_id=2);
+    IOrdersContract.push(orders_addr, is_buy=1, price=24, amount=400, dt=1666092048, owner=[user], limit_id=2);
     IOrdersContract.remove(orders_addr, 3);
     IOrdersContract.remove(orders_addr, 1);
     IOrdersContract.get(orders_addr, limit_id=2, idx=1);

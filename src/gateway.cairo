@@ -7,10 +7,11 @@ from starkware.cairo.common.uint256 import Uint256
 from lib.math_utils import MathUtils
 from starkware.starknet.common.syscalls import get_caller_address
 from lib.openzeppelin.access.ownable.library import Ownable
-from src.dex.structs import Market
+from src.dex.structs import Market, User
 from src.dex.events import log_create_bid
 
 const MAX_FELT = 7237005577332262320683916064616567226037794236132864326206141556383157321729; // 2^252 + 17 x 2^192 + 1
+const STARKNET_GOERLI_CHAIN_ID = 2;
 
 @contract_interface
 namespace IMarketsContract {
@@ -18,29 +19,29 @@ namespace IMarketsContract {
     func get_market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
     }
     // Submit a new bid (limit buy order) to a given market.
-    func create_bid(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_bid(caller : User, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new ask (limit sell order) to a given market.
-    func create_ask(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_ask(caller : User, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new market buy order to a given market.
-    func buy(caller : felt, market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
+    func buy(caller : User, market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
     }
     // Submit a new market sell order to a given market.
-    func sell(caller : felt, market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
+    func sell(caller : User, market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
     }
     // Delete an order and update limits, markets and balances.
-    func delete(caller : felt, order_id : felt) -> (success : felt) {
+    func delete(caller : User, order_id : felt) -> (success : felt) {
     }
 }
 
 @contract_interface
 namespace IBalancesContract {
     // Getter for user balances
-    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
+    func get_balance(user : User, asset : felt, in_account : felt) -> (amount : felt) {
     }
     // Setter for user balances
-    func set_balance(user : felt, asset : felt, in_account : felt, new_amount : felt) {
+    func set_balance(user : User, asset : felt, in_account : felt, new_amount : felt) {
     }
 }
 
@@ -66,6 +67,10 @@ func owner_addr() -> (id : felt) {
 @storage_var
 func markets_addr() -> (addr : felt) {
 }
+// Stores L2EthRemoteCore contract address.
+@storage_var
+func l2_eth_remote_core_addr() -> (addr : felt) {
+}
 // 1 if markets_addr has been set, 0 otherwise
 @storage_var
 func is_markets_addr_set() -> (bool : felt) {
@@ -73,10 +78,11 @@ func is_markets_addr_set() -> (bool : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt, _balances_addr : felt
+    owner : felt, _balances_addr : felt, _l2_eth_remote_core_addr : felt
 ) {
     Ownable.initializer(owner);
     balances_addr.write(_balances_addr);
+    l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
     return ();
 }
 
@@ -170,12 +176,12 @@ func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
     let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
-    let (success) = IMarketsContract.delete( _markets_addr, caller, order_id);
+    let (success) = IMarketsContract.delete(_markets_addr, caller, order_id);
     assert success = 1;
     return ();
 }
 
-// Deposit ERC20 token to exchange
+// Deposit ERC20 token to exchange.
 // @param asset : felt representation of ERC20 asset contract address
 // @param amount : amount to deposit
 @external
@@ -191,38 +197,81 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (a
     let (success) = IERC20.transferFrom(asset, caller, contract_address, amount_u256);
     assert success = 1;
 
+    deposit_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount);
+    return ();
+}
+
+// Relay remote deposit from other chain.
+// @dev Only callable by L2EthRemoteCore contract
+// @param user : felt representation of depositor's EOA
+// @param chain_id : ID of chain where funds originated
+// @param asset : asset address
+// @param amount : amount to deposit
+@external
+func remote_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, chain_id : felt, asset : felt, amount : felt
+) {
+    let (caller) = get_caller_address();
+    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
+    assert caller = _l2_eth_remote_core_addr;
+    deposit_helper(user, chain_id, asset, amount);
+    return ();
+}
+
+// Helper function to trigger deposit
+func deposit_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    user : felt, chain_id : felt, asset : felt, amount : felt
+) {
     let (_balances_addr) = balances_addr.read();
-    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, caller, asset, 1);
-    IBalancesContract.set_balance(_balances_addr, caller, asset, 1, user_dex_balance + amount);
-
+    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
+    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, [caller], asset, 1);
+    IBalancesContract.set_balance(_balances_addr, [caller], asset, 1, user_dex_balance + amount);
     return ();
 }
 
-// Can only be called by lender
-func remote_deposit(user : felt, asset : felt, amount : felt) {
-    // Checks are already implemented on Ethereum side - can use Storage Proofs later
-    // Transfer from lender to this contract
-    // Update mappings
-    return ();
-}
-
-// Withdraw exchange balance as ERC20 token
+// Withdraw exchange balance as ERC20 token.
 // @param asset : felt representation of ERC20 asset contract address
 // @param amount : amount to deposit
 @external
 func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (asset : felt, amount : felt) {
     let (_balances_addr) = balances_addr.read();
     let (caller) = get_caller_address();
-    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, caller, asset, 1);
+    withdraw_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount, caller);
+    return ();
+}
+
+// Relay remote withdraw from other chain.
+// @dev Only callable by L2EthRemoteCore contract
+// @param user : felt representation of depositor's EOA
+// @param chain_id : ID of chain where funds originated
+// @param asset : asset address
+// @param amount : amount to deposit
+@external
+func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    user : felt, chain_id : felt, asset : felt, amount : felt
+) {
+    let (caller) = get_caller_address();
+    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
+    assert caller = _l2_eth_remote_core_addr;
+    withdraw_helper(user, chain_id, asset, amount, _l2_eth_remote_core_addr);
+    // Call remote_withdraw()
+    return ();
+}
+
+// Helper function to trigger withdrawal
+func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    user : felt, chain_id : felt, asset : felt, amount : felt, recipient : felt
+) {
+    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
+    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, [caller], asset, 1);
     let is_sufficient = is_le(amount, user_dex_balance); 
     assert is_sufficient = 1;
     
+    IBalancesContract.set_balance(_balances_addr, [caller], asset, 1, user_dex_balance - amount);
     let (contract_address) = get_contract_address();
-    IBalancesContract.set_balance(_balances_addr, caller, asset, 1, user_dex_balance - amount);
     let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
-    let (success) = IERC20.transferFrom(asset, contract_address, caller, amount_u256);
+    let (success) = IERC20.transferFrom(asset, contract_address, recipient, amount_u256);
     assert success = 1;
-
     return ();
 }
 

@@ -72,6 +72,7 @@ func test_gateway{
     range_check_ptr
 } () {
     alloc_locals;
+    
 
     // Set contract addresses
     const owner_addr = 31678259801237;
