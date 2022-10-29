@@ -4,6 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
+from lib.openzeppelin.access.ownable.library import Ownable
 
 // Stores user balances.
 @storage_var
@@ -12,10 +13,6 @@ func account_balances(user : felt, asset : felt) -> (amount : felt) {
 // Stores user balances locked in open orders.
 @storage_var
 func order_balances(user : felt, asset : felt) -> (amount : felt) {
-}
-// Stores contract address of contract owner.
-@storage_var
-func owner_addr() -> (id : felt) {
 }
 // Stores contract address of MarketsContract.
 @storage_var
@@ -36,9 +33,9 @@ func is_gateway_addr_set() -> (bool : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    _owner_addr : felt
+    owner : felt
 ) {
-    owner_addr.write(_owner_addr);
+    Ownable.initializer(owner);
     return ();
 }
 
@@ -46,9 +43,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @dev Can only be called by contract owner and is write once.
 @external
 func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt, _gateway_addr : felt) {
-    let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
-    assert caller = _owner_addr;
+    Ownable.assert_only_owner();
     let (_is_markets_addr_set) = is_markets_addr_set.read();
     let (_is_gateway_addr_set) = is_gateway_addr_set.read();
     if (_is_markets_addr_set + _is_gateway_addr_set == 0) {
@@ -183,12 +178,8 @@ func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     alloc_locals;
     let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
     let (_markets_addr) = markets_addr.read();
     let (_gateway_addr) = gateway_addr.read();
-    if (caller == _owner_addr) {
-        return ();
-    }
     if (caller == _markets_addr) {
         return ();
     }

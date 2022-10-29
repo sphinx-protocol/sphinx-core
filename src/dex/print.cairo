@@ -2,6 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
+from src.dex.structs import Order, Limit, Market
 
 // Utility function for printing list of orders.
 @view

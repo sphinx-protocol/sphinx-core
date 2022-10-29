@@ -46,59 +46,7 @@ func test_markets{
 } () {
     alloc_locals;
 
-    // Set params
-    const owner_addr = 31678259801237;
-    const gateway_addr = 1123123123;
-    const buyer = 123456789;
-    const seller = 666666666;
-    const base_asset = 123213123123;
-    const quote_asset = 788978978998;
-
-    // Deploy contracts
-    local orders_addr: felt;
-    local limits_addr: felt;
-    local balances_addr: felt;
-    local markets_addr: felt;
-    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.limits_addr = deploy_contract("./src/dex/limits.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.balances_addr = deploy_contract("./src/dex/balances.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.markets_addr = deploy_contract("./src/dex/markets.cairo", [ids.owner_addr, ids.gateway_addr, ids.orders_addr, ids.limits_addr, ids.balances_addr]).contract_address %}
-
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.markets_addr) %}
-    let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset);
-    %{ stop_prank_callable() %}
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.balances_addr) %}
-    IBalancesContract.set_balance(balances_addr, buyer, base_asset, 1, 5000);
-    IBalancesContract.set_balance(balances_addr, seller, quote_asset, 1, 5000);
-    %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.gateway_addr, target_contract_address=ids.markets_addr) %}
-    %{ stop_warp = warp(200) %}
-    IMarketsContract.create_bid(markets_addr, new_market.id, 1, 1000, 1);
-    %{ stop_warp = warp(220) %}
-    IMarketsContract.create_bid(markets_addr, new_market.id, 1, 200, 1);
-    %{ stop_warp = warp(321) %}
-    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 500, 0);
-    %{ stop_warp = warp(335) %}
-    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 300, 0);
-    %{ stop_warp = warp(350) %}
-    IMarketsContract.create_ask(markets_addr, new_market.id, 1, 300, 0);
-    %{ stop_warp %}
-    %{ stop_prank_callable() %}
-
-    // %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.balances_addr) %}
-    // let (buyer_base_account_balance) = IBalancesContract.get_balance(balances_addr, buyer, base_asset, 1);
-    // let (buyer_base_locked_balance) = IBalancesContract.get_balance(balances_addr, buyer, base_asset, 0);
-    // let (buyer_quote_account_balance) = IBalancesContract.get_balance(balances_addr, buyer, quote_asset, 1);
-    // let (buyer_quote_locked_balance) = IBalancesContract.get_balance(balances_addr, buyer, quote_asset, 0);
-    // let (seller_base_account_balance) = IBalancesContract.get_balance(balances_addr, seller, base_asset, 1);
-    // let (seller_base_locked_balance) = IBalancesContract.get_balance(balances_addr, seller, base_asset, 0);
-    // let (seller_quote_account_balance) = IBalancesContract.get_balance(balances_addr, seller, quote_asset, 1);
-    // let (seller_quote_locked_balance) = IBalancesContract.get_balance(balances_addr, seller, quote_asset, 0);
-    // %{ stop_prank_callable() %}
-
-    // %{ print("[test_markets.cairo] buyer_base_account_balance: {}, buyer_base_locked_balance: {}, buyer_quote_account_balance: {}, buyer_quote_locked_balance: {}".format(ids.buyer_base_account_balance, ids.buyer_base_locked_balance, ids.buyer_quote_account_balance, ids.buyer_quote_locked_balance)) %}
-    // %{ print("[test_markets.cairo] seller_base_account_balance: {}, seller_base_locked_balance: {}, seller_quote_account_balance: {}, seller_quote_locked_balance: {}".format(ids.seller_base_account_balance, ids.seller_base_locked_balance, ids.seller_quote_account_balance, ids.seller_quote_locked_balance)) %}
+    // Migrated to test_gateway.cairo
 
     return ();
 }

@@ -6,6 +6,7 @@ from starkware.starknet.common.syscalls import get_contract_address
 from starkware.cairo.common.uint256 import Uint256
 from lib.math_utils import MathUtils
 from starkware.starknet.common.syscalls import get_caller_address
+from lib.openzeppelin.access.ownable.library import Ownable
 from src.dex.structs import Market
 from src.dex.events import log_create_bid
 
@@ -17,19 +18,19 @@ namespace IMarketsContract {
     func get_market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
     }
     // Submit a new bid (limit buy order) to a given market.
-    func create_bid(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_bid(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new ask (limit sell order) to a given market.
-    func create_ask(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_ask(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new market buy order to a given market.
-    func buy(market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
+    func buy(caller : felt, market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
     }
     // Submit a new market sell order to a given market.
-    func sell(market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
+    func sell(caller : felt, market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
     }
     // Delete an order and update limits, markets and balances.
-    func delete(order_id : felt) -> (success : felt) {
+    func delete(caller : felt, order_id : felt) -> (success : felt) {
     }
 }
 
@@ -72,9 +73,9 @@ func is_markets_addr_set() -> (bool : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    _owner_addr : felt, _balances_addr : felt
+    owner : felt, _balances_addr : felt
 ) {
-    owner_addr.write(_owner_addr);
+    Ownable.initializer(owner);
     balances_addr.write(_balances_addr);
     return ();
 }
@@ -83,9 +84,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @dev Can only be called by contract owner and is write once.
 @external
 func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
-    let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
-    assert caller = _owner_addr;
+    Ownable.assert_only_owner();
     let (is_set) = is_markets_addr_set.read();
     if (is_set == 0) {
         markets_addr.write(_markets_addr);
@@ -107,9 +106,10 @@ func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    let (success) = IMarketsContract.create_bid(_markets_addr, market_id, price, amount, post_only);
+    let (success) = IMarketsContract.create_bid(_markets_addr, caller, market_id, price, amount, post_only);
     assert success = 1;
     return ();
 }
@@ -124,9 +124,10 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    let (success) = IMarketsContract.create_ask(_markets_addr, market_id, price, amount, post_only);
+    let (success) = IMarketsContract.create_ask(_markets_addr, caller, market_id, price, amount, post_only);
     assert success = 1;
     return ();
 }
@@ -139,9 +140,10 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, amount : felt
 ) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    let (success) = IMarketsContract.buy(_markets_addr, market_id, MAX_FELT, amount);
+    let (success) = IMarketsContract.buy(_markets_addr, caller, market_id, MAX_FELT, amount);
     assert success = 1;
     return ();
 }
@@ -154,9 +156,10 @@ func market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, amount : felt
 ) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    let (success) = IMarketsContract.sell(_markets_addr, market_id, 0, amount);
+    let (success) = IMarketsContract.sell(_markets_addr, caller, market_id, 0, amount);
     assert success = 1;
     return ();
 }
@@ -165,8 +168,9 @@ func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param order_id : ID of order
 @external
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
-    let (success) = IMarketsContract.delete(_markets_addr, order_id);
+    let (success) = IMarketsContract.delete( _markets_addr, caller, order_id);
     assert success = 1;
     return ();
 }

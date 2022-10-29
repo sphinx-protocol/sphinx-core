@@ -6,6 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.starknet.common.syscalls import get_block_timestamp
+from lib.openzeppelin.access.ownable.library import Ownable
 from src.dex.structs import Order, Limit, Market
 from src.dex.events import (
     log_create_market, log_create_bid, log_create_ask, log_bid_taken, log_offer_taken, log_buy_filled, log_sell_filled, log_delete_order
@@ -106,10 +107,6 @@ func limits_addr() -> (addr : felt) {
 @storage_var
 func balances_addr() -> (addr : felt) {
 }
-// Stores contract address of contract owner.
-@storage_var
-func owner_addr() -> (id : felt) {
-}
 // Stores contract address of GatewayContract.
 @storage_var
 func gateway_addr() -> (id : felt) {
@@ -117,16 +114,21 @@ func gateway_addr() -> (id : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    _owner_addr : felt, _gateway_addr : felt, _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
+    owner : felt, _gateway_addr : felt, _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
 ) {
     curr_market_id.write(1);
     curr_tree_id.write(1);
-    owner_addr.write(_owner_addr);
+    Ownable.initializer(owner);
     gateway_addr.write(_gateway_addr);
     orders_addr.write(_orders_addr);
     limits_addr.write(_limits_addr);
     balances_addr.write(_balances_addr);
     return ();
+}
+
+// Get owner
+func owner{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (owner: felt) {
+    return Ownable.owner();
 }
 
 // Get market ID given two assets (or 0 if one doesn't exist).
@@ -160,25 +162,25 @@ func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     base_asset : felt, quote_asset : felt
 ) -> (new_market : Market) {
     alloc_locals;
-    check_permissions();
+    Ownable.assert_only_owner();
     
     let (market_id) = curr_market_id.read();
     let (tree_id) = curr_tree_id.read();
-    let (caller) = get_caller_address();
-    
+    let (_owner) = owner();
+
     tempvar new_market: Market* = new Market(
         id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
-        base_asset=base_asset, quote_asset=quote_asset, controller=caller
+        base_asset=base_asset, quote_asset=quote_asset, controller=_owner
     );
     markets.write(market_id, [new_market]);
 
     curr_market_id.write(market_id + 1);
     curr_tree_id.write(tree_id + 2);
-    market_ids.write(base_asset, quote_asset, market_id + 1);
+    market_ids.write(base_asset, quote_asset, market_id);
 
     log_create_market.emit(
         id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
-        base_asset=base_asset, quote_asset=quote_asset, controller=caller
+        base_asset=base_asset, quote_asset=quote_asset, controller=_owner
     );
 
     return (new_market=[new_market]);
@@ -201,6 +203,7 @@ func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 }
 
 // Submit a new bid (limit buy order) to a given market.
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market_id : ID of market
 // @param price : limit price of order
 // @param amount : order size in number of tokens of quote asset
@@ -208,10 +211,10 @@ func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 // @return success : 1 if successfully created bid, 0 otherwise
 @external
 func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market_id : felt, price : felt, amount : felt, post_only : felt
+    caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
-    check_permissions();
+    // check_permissions();
 
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
@@ -232,7 +235,7 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         handle_revoked_refs();
         if (is_market_order == 1) {
             if (post_only == 0) {
-                let (buy_order_success) = buy(market.id, price, amount);
+                let (buy_order_success) = buy(caller, market.id, price, amount);
                 assert buy_order_success = 1;
                 handle_revoked_refs();
                 return (success=1);
@@ -252,12 +255,12 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         let (new_limit) = ILimitsContract.insert(_limits_addr, price, market.bid_tree_id, market.id);
         let create_limit_success = is_le(1, new_limit.id);
         assert create_limit_success = 1;
-        let (create_bid_success) = create_bid_helper(market, new_limit, price, amount, post_only);
+        let (create_bid_success) = create_bid_helper(caller, market, new_limit, price, amount, post_only);
         assert create_bid_success = 1;
         handle_revoked_refs();
     } else {
         // Add order to limit tree
-        let (create_bid_success) = create_bid_helper(market, limit, price, amount, post_only);
+        let (create_bid_success) = create_bid_helper(caller, market, limit, price, amount, post_only);
         assert create_bid_success = 1;
         handle_revoked_refs();
     }
@@ -266,13 +269,14 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 }
 
 // Helper function for creating a new bid (limit buy order).
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market : market to which bid is being submitted
 // @param limit : limit tree to which bid is being submitted
 // @param price : limit price of order
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created bid, 0 otherwise
 func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+    caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
 
@@ -280,7 +284,6 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     let (_limits_addr) = limits_addr.read();
     let (_balances_addr) = balances_addr.read();
     
-    let (caller) = get_caller_address();
     let (account_balance) = IBalancesContract.get_balance(_balances_addr, caller, market.base_asset, 1);
     let balance_sufficient = is_le(amount, account_balance);
     if (balance_sufficient == 0) {
@@ -318,6 +321,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 }
 
 // Submit a new ask (limit sell order) to a given market.
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market_id : ID of market
 // @param price : limit price of order
 // @param amount : order size in number of tokens of quote asset
@@ -325,7 +329,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @return success : 1 if successfully created ask, 0 otherwise
 @external
 func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market_id : felt, price : felt, amount : felt, post_only : felt
+    caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -347,7 +351,7 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         handle_revoked_refs();
         if (is_market_order == 1) {
             if (post_only == 0) {
-                let (sell_order_success) = sell(market.id, price, amount);
+                let (sell_order_success) = sell(caller, market.id, price, amount);
                 assert sell_order_success = 1;
                 handle_revoked_refs();
                 return (success=1);
@@ -368,12 +372,12 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
         let (new_limit) = ILimitsContract.insert(_limits_addr, price, market.ask_tree_id, market.id);
         let create_limit_success = is_le(1, new_limit.id);
         assert create_limit_success = 1;
-        let (create_ask_success) = create_ask_helper(market, new_limit, price, amount, post_only);
+        let (create_ask_success) = create_ask_helper(caller, market, new_limit, price, amount, post_only);
         assert create_ask_success = 1;
         handle_revoked_refs();
     } else {
         // Add order to limit tree
-        let (create_ask_success) = create_ask_helper(market, limit, price, amount, post_only);
+        let (create_ask_success) = create_ask_helper(caller, market, limit, price, amount, post_only);
         assert create_ask_success = 1;
         handle_revoked_refs();
     }
@@ -382,20 +386,20 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 }
 
 // Helper function for creating a new ask (limit sell order).
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market : market to which bid is being submitted
 // @param limit : limit tree to which bid is being submitted
 // @param price : limit price of order
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created bid, 0 otherwise
 func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+    caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
 ) -> (success : felt) {
     alloc_locals;
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
     let (_balances_addr) = balances_addr.read();
 
-    let (caller) = get_caller_address();
     let (account_balance) = IBalancesContract.get_balance(_balances_addr, caller, market.quote_asset, 1);
     let balance_sufficient = is_le(amount, account_balance);
     if (balance_sufficient == 0) {
@@ -433,13 +437,14 @@ func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 }
 
 // Submit a new market buy order to a given market.
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market_id : ID of market
 // @param max_price : highest price at which buyer is willing to fulfill order
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created bid, 0 otherwise
 @external
 func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market_id : felt, max_price : felt, amount : felt
+    caller : felt, market_id : felt, max_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -451,7 +456,6 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (market) = markets.read(market_id);
     let (lowest_ask) = IOrdersContract.get_order(_orders_addr, market.lowest_ask);
     let (base_amount, _) = unsigned_div_rem(amount, lowest_ask.price);
-    let (caller) = get_caller_address();
     let (account_balance) = IBalancesContract.get_balance(_balances_addr, caller, market.base_asset, 1);
     let is_sufficient = is_le(base_amount, account_balance);
     let is_positive = is_le(1, amount);
@@ -464,7 +468,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let lowest_ask_exists = is_le(1, market.lowest_ask);
     if (lowest_ask_exists == 0) {
-        let (create_bid_success) = create_bid(market_id, max_price, amount, 0);
+        let (create_bid_success) = create_bid(caller, market_id, max_price, amount, 0);
         assert create_bid_success = 1;
         handle_revoked_refs();
         return (success=0);
@@ -474,7 +478,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let is_below_max_price = is_le(lowest_ask.price, max_price);
     if (is_below_max_price == 0) {
-        let (create_bid_success) = create_bid(market_id, max_price, amount, 0);
+        let (create_bid_success) = create_bid(caller, market_id, max_price, amount, 0);
         assert create_bid_success = 1;
         handle_revoked_refs();
         return (success=1);
@@ -503,7 +507,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     } else {
         // Fill entire order
         IOrdersContract.set_filled(_orders_addr, lowest_ask.id, lowest_ask.amount);
-        delete(lowest_ask.id);
+        delete(caller, lowest_ask.id);
         let (base_amount, _) = unsigned_div_rem(lowest_ask.amount - lowest_ask.filled, lowest_ask.price);
         let (transfer_balance_success_1) = IBalancesContract.transfer_balance(_balances_addr, caller, lowest_ask.owner, market.base_asset, base_amount);
         assert transfer_balance_success_1 = 1;
@@ -513,7 +517,7 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         log_offer_taken.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount - lowest_ask.filled, total_filled=amount);
         log_buy_filled.emit(id=lowest_ask.id, limit_id=limit.id, market_id=market.id, dt=dt, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount - lowest_ask.filled, total_filled=amount);
 
-        buy(market_id, max_price, amount - lowest_ask.amount + lowest_ask.filled); 
+        buy(caller, market_id, max_price, amount - lowest_ask.amount + lowest_ask.filled); 
         
         handle_revoked_refs();
         return (success=1);
@@ -521,13 +525,14 @@ func buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 }
 
 // Submit a new market sell order to a given market.
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param market_id : ID of market
 // @param min_price : lowest price at which seller is willing to fulfill order
 // @param amount : order size in number of tokens of quote asset
 // @return success : 1 if successfully created ask, 0 otherwise
 @external
 func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market_id : felt, min_price : felt, amount : felt
+    caller : felt, market_id : felt, min_price : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -537,7 +542,6 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (_balances_addr) = balances_addr.read();
 
     let (market) = markets.read(market_id);
-    let (caller) = get_caller_address();
     let (account_balance) = IBalancesContract.get_balance(_balances_addr, caller, market.quote_asset, 1);
     let is_sufficient = is_le(amount, account_balance);
     let is_positive = is_le(1, amount);
@@ -550,7 +554,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 
     let highest_bid_exists = is_le(1, market.highest_bid);
     if (highest_bid_exists == 0) {
-        let (create_ask_success) = create_ask(market_id, min_price, amount, 0);
+        let (create_ask_success) = create_ask(caller, market_id, min_price, amount, 0);
         assert create_ask_success = 1;
         handle_revoked_refs();
         return (success=0);
@@ -561,7 +565,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (highest_bid) = IOrdersContract.get_order(_orders_addr, market.highest_bid);
     let is_above_min_price = is_le(min_price, highest_bid.price);
     if (is_above_min_price == 0) {
-        let (create_ask_success) = create_ask(market_id, min_price, amount, 0);
+        let (create_ask_success) = create_ask(caller, market_id, min_price, amount, 0);
         assert create_ask_success = 1;
         handle_revoked_refs();
         return (success=1);
@@ -592,7 +596,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     } else {
         // Fill entire order
         IOrdersContract.set_filled(_orders_addr, highest_bid.id, highest_bid.amount);
-        delete(highest_bid.id);
+        delete(caller, highest_bid.id);
         let (base_amount, _) = unsigned_div_rem(highest_bid.amount - highest_bid.filled, highest_bid.price);
         let (transfer_balance_success_1) = IBalancesContract.transfer_balance(_balances_addr, caller, highest_bid.owner, market.quote_asset, amount);
         assert transfer_balance_success_1 = 1;
@@ -602,7 +606,7 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         log_bid_taken.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=amount);
         log_sell_filled.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=amount);
 
-        sell(market_id, min_price, amount - highest_bid.amount + highest_bid.filled); 
+        sell(caller, market_id, min_price, amount - highest_bid.amount + highest_bid.filled); 
         
         handle_revoked_refs();
         return (success=1);
@@ -610,17 +614,18 @@ func sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 }
 
 // Delete an order and update limits, markets and balances.
+// @param caller : caller of contract method, passed in from GatewayContract
 // @param order_id : ID of order
 @external
-func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
+func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    caller : felt, order_id : felt
+) -> (success : felt) {
     alloc_locals;
     check_permissions();
     
     let (_orders_addr) = orders_addr.read();
     let (_limits_addr) = limits_addr.read();
     let (_balances_addr) = balances_addr.read();
-
-    let (caller) = get_caller_address();
     let (order) = IOrdersContract.get_order(_orders_addr, order_id);
 
     if (caller == order.owner) {
@@ -693,19 +698,9 @@ func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (or
 @view
 func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
     let (_gateway_addr) = gateway_addr.read();
-    %{ print("caller: {}, owner_addr: {}, gateway_addr: {}".format(ids.caller, ids._owner_addr, ids._gateway_addr)) %}
-    if (caller == _owner_addr) {
-        %{ print("caller == _owner_addr") %}
-        return ();
-    }
-    if (caller == _gateway_addr) {
-        %{ print("caller == _gateway_addr") %}
-        return ();
-    }
     with_attr error_message("Caller does not have permission to call this function.") {
-        assert 1 = 0;
+        assert caller = _gateway_addr;
     }
     return ();
 }

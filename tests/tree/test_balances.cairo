@@ -47,9 +47,6 @@ func test_balances{
     IBalancesContract.set_balance(balances_addr, 123456, 1, 1, 1000);
     let (amount) = IBalancesContract.get_balance(balances_addr, 123456, 1, 1);
     assert amount = 1000;
-    %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.balances_addr) %}
     let (success) = IBalancesContract.transfer_balance(balances_addr, 123456, 456789, 1, 500);
     assert success = 1;
     %{ stop_prank_callable() %}

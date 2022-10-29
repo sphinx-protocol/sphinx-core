@@ -5,6 +5,7 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 from src.dex.structs import Limit
+from lib.openzeppelin.access.ownable.library import Ownable
 // from src.dex.print import print_limit, print_limit_tree
 
 // Stores details of limit prices as mapping.
@@ -19,10 +20,6 @@ func roots(tree_id : felt) -> (id : felt) {
 @storage_var
 func curr_limit_id() -> (id : felt) {
 }
-// Stores contract address of contract owner.
-@storage_var
-func owner_addr() -> (id : felt) {
-}
 // Stores contract address of MarketsContract.
 @storage_var
 func markets_addr() -> (id : felt) {
@@ -34,10 +31,10 @@ func is_markets_addr_set() -> (bool : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    _owner_addr : felt
+    owner : felt
 ) {
     curr_limit_id.write(1);
-    owner_addr.write(_owner_addr);
+    Ownable.initializer(owner);
     return ();
 }
 
@@ -45,9 +42,7 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @dev Can only be called by contract owner and is write once.
 @external
 func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
-    let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
-    assert caller = _owner_addr;
+    Ownable.assert_only_owner();
     let (is_set) = is_markets_addr_set.read();
     if (is_set == 0) {
         markets_addr.write(_markets_addr);
@@ -419,11 +414,7 @@ func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 @view
 func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
     let (caller) = get_caller_address();
-    let (_owner_addr) = owner_addr.read();
     let (_markets_addr) = markets_addr.read();
-    if (caller == _owner_addr) {
-        return ();
-    }
     if (caller == _markets_addr) {
         return ();
     }

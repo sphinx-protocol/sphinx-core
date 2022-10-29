@@ -53,9 +53,6 @@ func test_limits{
     ILimitsContract.insert(limits_addr, 70, 0, 0);
     ILimitsContract.insert(limits_addr, 60, 0, 0);
     ILimitsContract.insert(limits_addr, 80, 0, 0);
-    %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.limits_addr) %}
     ILimitsContract.delete(limits_addr, 50, 0, 0);
     ILimitsContract.delete(limits_addr, 25, 0, 0);
     ILimitsContract.delete(limits_addr, 70, 0, 0);

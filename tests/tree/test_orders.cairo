@@ -2,6 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from src.dex.structs import Order
+from lib.openzeppelin.access.ownable.library import Ownable
 
 @contract_interface
 namespace IOrdersContract {
@@ -36,13 +37,13 @@ func test_orders{
 } () {
     alloc_locals;
 
-    const owner_addr = 456456456;
+    const owner = 456456456;
     const markets_addr = 7878787878;
 
     local orders_addr: felt;
-    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner_addr]).contract_address %}
+    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner]).contract_address %}
 
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.orders_addr) %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.orders_addr) %}
     IOrdersContract.set_markets_addr(orders_addr, markets_addr);
     %{ stop_prank_callable() %}
 
@@ -50,9 +51,7 @@ func test_orders{
     IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=1000, dt=1666091715, owner=123456, limit_id=1);
     IOrdersContract.push(orders_addr, is_buy=0, price=24, amount=500, dt=1666091888, owner=456789, limit_id=2);
     IOrdersContract.push(orders_addr, is_buy=1, price=25, amount=750, dt=1666091950, owner=789123, limit_id=1);
-    %{ stop_prank_callable() %}
-    
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.orders_addr) %}
+
     IOrdersContract.push(orders_addr, is_buy=1, price=24, amount=400, dt=1666092048, owner=123456, limit_id=2);
     IOrdersContract.remove(orders_addr, 3);
     IOrdersContract.remove(orders_addr, 1);
