@@ -21,7 +21,6 @@ namespace IL2EthRemoteCoreContract {
     }
 }
 
-
 @contract_interface
 namespace IMarketsContract {
     // Get market ID given two assets (or 0 if one doesn't exist).
@@ -64,46 +63,64 @@ namespace IERC20 {
     }
 }
 
-// Stores IBalancesContract contract address.
+// Stores BalancesContract address.
 @storage_var
 func balances_addr() -> (addr : felt) {
 }
-// Stores contract address of contract owner.
+// 1 if BalancesContract has been set, 0 otherwise
 @storage_var
-func owner_addr() -> (id : felt) {
+func is_balances_addr_set() -> (bool : felt) {
 }
-// Stores IMarketsContract contract address.
+// Stores MarketsContract address.
 @storage_var
 func markets_addr() -> (addr : felt) {
+}
+// 1 if MarketsContract address has been set, 0 otherwise
+@storage_var
+func is_markets_addr_set() -> (bool : felt) {
 }
 // Stores L2EthRemoteCore contract address.
 @storage_var
 func l2_eth_remote_core_addr() -> (addr : felt) {
 }
-// 1 if markets_addr has been set, 0 otherwise
+// 1 if L2EthRemoteCore contract address has been set, 0 otherwise
 @storage_var
-func is_markets_addr_set() -> (bool : felt) {
+func is_eth_remote_core_set() -> (bool : felt) {
+}
+// Stores L2EthRemoteEIP712 contract address.
+@storage_var
+func l2_eth_remote_eip_712_addr() -> (addr : felt) {
+}
+// 1 if L2EthRemoteEIP712 has been set, 0 otherwise
+@storage_var
+func is_eth_remote_eip_712_set() -> (bool : felt) {
 }
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt, _balances_addr : felt, _l2_eth_remote_core_addr : felt
+    owner : felt
 ) {
     Ownable.initializer(owner);
-    balances_addr.write(_balances_addr);
-    l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
     return ();
 }
 
-// Set MarketsContract address.
-// @dev Can only be called by contract owner and is write once.
 @external
-func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
+func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} (
+    _balances_addr: felt, 
+    _markets_addr: felt, 
+    _l2_eth_remote_core_addr : felt, 
+    _l2_eth_remote_eip_712_addr : felt
+) {
     Ownable.assert_only_owner();
-    let (is_set) = is_markets_addr_set.read();
-    if (is_set == 0) {
+    let (_is_balances_addr_set) = is_balances_addr_set.read();
+    let (_is_markets_addr_set) = is_markets_addr_set.read();
+    let (_is_eth_remote_core_set) = is_eth_remote_core_set.read();
+    let (_is_eth_remote_eip_712_set) = is_is_eth_remote_eip_712_setgateway_addr_set.read();
+    if (_is_balances_addr_set + _is_markets_addr_set + _is_eth_remote_core_set + _is_eth_remote_eip_712_set == 0) {
+        balances_addr.write(_balances_addr);
         markets_addr.write(_markets_addr);
-        is_markets_addr_set.write(1);
+        l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
+        l2_eth_remote_eip_712_addr.write(_l2_eth_remote_eip_712_addr);
         handle_revoked_refs();
     } else {
         handle_revoked_refs();
@@ -122,6 +139,34 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
+    create_bid_helper(caller, STARKNET_GOERLI_CHAIN_ID, base_asset, quote_asset, price, amount, post_only);
+    return ();
+}
+
+// Submit a new bid (limit buy order) to a given market.
+// @param user : felt representation of user EOA
+// @param chain_id : ID of chain where funds originated
+// @param base_asset : felt representation of ERC20 base asset contract address
+// @param quote_asset : felt representation of ERC20 quote asset contract address
+// @param price : limit price of order
+// @param amount : order size in number of tokens of quote asset
+// @param post_only : 1 if create bid in post only mode, 0 otherwise
+@external
+func remote_create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+) {
+    let (caller) = get_caller_address();
+    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
+    assert caller = _l2_eth_remote_core_addr;
+    create_bid_helper(user, chain_id, base_asset, quote_asset, price, amount, post_only);
+    return ();
+}
+
+// Helper function to create bid.
+func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+) {
+    let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
     let (success) = IMarketsContract.create_bid(_markets_addr, caller, market_id, price, amount, post_only);
@@ -134,7 +179,7 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
 // @param amount : order size in number of tokens of quote asset
-// @param post_only : 1 if create bid in post only mode, 0 otherwise
+// @param post_only : 1 if create ask in post only mode, 0 otherwise
 @external
 func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
@@ -245,11 +290,15 @@ func deposit_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (asset : felt, amount : felt) {
     let (_balances_addr) = balances_addr.read();
     let (caller) = get_caller_address();
-    withdraw_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount, caller);
+    withdraw_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount);
+    let (contract_address) = get_contract_address();
+    let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
+    let (success) = IERC20.transferFrom(asset, contract_address, caller, amount_u256);
+    assert success = 1;
     return ();
 }
 
-// Relay remote withdraw from other chain.
+// Relay remote withdraw request from other chain.
 // @dev Only callable by L2EthRemoteCore contract
 // @param user : felt representation of depositor's EOA
 // @param chain_id : ID of chain where funds originated
@@ -260,11 +309,11 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     user : felt, chain_id : felt, asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     if (chain_id == ETH_GOERLI_CHAIN_ID) {
-        withdraw_helper(user, chain_id, asset, amount, _l2_eth_remote_core_addr);
-        IL2EthRemoteCoreContract.confirm_remote_withdraw(_l2_eth_remote_core_addr, user, asset, amount);
+        withdraw_helper(user, chain_id, asset, amount);
+        IL2EthRemoteCoreContract.remote_withdraw(_l2_eth_remote_core_addr, user, chain_id, asset, amount);
     } else {
         with_attr error_message("Chain ID not valid") {
             assert 1 = 0;
@@ -275,18 +324,13 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 
 // Helper function to trigger withdrawal
 func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    user : felt, chain_id : felt, asset : felt, amount : felt, recipient : felt
+    user : felt, chain_id : felt, asset : felt, amount : felt
 ) {
     tempvar caller : User* = new User(addr=user, chain_id=chain_id);
     let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, [caller], asset, 1);
     let is_sufficient = is_le(amount, user_dex_balance); 
     assert is_sufficient = 1;
-    
     IBalancesContract.set_balance(_balances_addr, [caller], asset, 1, user_dex_balance - amount);
-    let (contract_address) = get_contract_address();
-    let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
-    let (success) = IERC20.transferFrom(asset, contract_address, recipient, amount_u256);
-    assert success = 1;
     return ();
 }
 

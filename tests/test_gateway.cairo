@@ -60,8 +60,14 @@ namespace IGatewayContract {
     // Deposit ERC20 token to exchange
     func deposit(asset : felt, amount : felt) {
     }
+    // Relay remote deposit from other chain.
+    func remote_deposit(user : felt, chain_id : felt, asset : felt, amount : felt) {
+    }
     // Withdraw exchange balance as ERC20 token
     func withdraw(asset : felt, amount : felt) {
+    }
+    // Relay remote withdraw request from other chain.
+    func remote_withdraw(user : felt, chain_id : felt, asset : felt, amount : felt) {
     }
 }
 
