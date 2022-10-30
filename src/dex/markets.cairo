@@ -140,7 +140,13 @@ func get_market_ids{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
     base_asset : felt, quote_asset : felt) -> (market_id : felt
 ) {
     let (market_id) = market_ids.read(base_asset, quote_asset);
-    return (market_id=market_id);
+    if (market_id == 0) {
+        // Checks for reverse order
+        let (alt_market_id) = market_ids.read(quote_asset, base_asset);
+        return (market_id=alt_market_id);
+    } else {
+        return (market_id=market_id);
+    }
 }
 
 // Get market from market ID.
@@ -164,6 +170,10 @@ func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     alloc_locals;
     Ownable.assert_only_owner();
     
+    let (existing_market_id) = get_market_ids(base_asset, quote_asset);
+    let (market_exists) = is_le(1, existing_market_id);
+    assert market_exists = 0;
+
     let (market_id) = curr_market_id.read();
     let (tree_id) = curr_tree_id.read();
     let (_owner) = owner();
