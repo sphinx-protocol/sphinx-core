@@ -95,34 +95,67 @@ func curr_market_id() -> (id : felt) {
 @storage_var
 func curr_tree_id() -> (id : felt) {
 }
-// Stores IOrdersContract contract address.
+// Stores OrdersContract contract address.
 @storage_var
 func orders_addr() -> (addr : felt) {
+}
+// 1 if OrdersContract has been set, 0 otherwise
+@storage_var
+func is_orders_addr_set() -> (bool : felt) {
 }
 // Stores ILimitsContract contract address.
 @storage_var
 func limits_addr() -> (addr : felt) {
 }
-// Stores IBalancesContract contract address.
+// 1 if LimitsContract has been set, 0 otherwise
+@storage_var
+func is_limits_addr_set() -> (bool : felt) {
+}
+// Stores BalancesContract contract address.
 @storage_var
 func balances_addr() -> (addr : felt) {
+}
+// 1 if BalancesContract has been set, 0 otherwise
+@storage_var
+func is_balances_addr_set() -> (bool : felt) {
 }
 // Stores contract address of GatewayContract.
 @storage_var
 func gateway_addr() -> (id : felt) {
 }
+// 1 if GatewayContract has been set, 0 otherwise
+@storage_var
+func is_gateway_addr_set() -> (bool : felt) {
+}
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt, _gateway_addr : felt, _orders_addr : felt, _limits_addr : felt, _balances_addr : felt
-) {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (owner : felt) {
     curr_market_id.write(1);
     curr_tree_id.write(1);
     Ownable.initializer(owner);
-    gateway_addr.write(_gateway_addr);
+    return ();
+}
+
+// Set MarketsContract and GatewayContract address.
+// @dev Can only be called by contract owner and is write once.
+@external
+func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    _orders_addr : felt, _limits_addr : felt, _balances_addr : felt, _gateway_addr : felt
+) {
+    Ownable.assert_only_owner();
+    let (_is_orders_addr_set) = is_orders_addr_set.read();
+    let (_is_limits_addr_set) = is_limits_addr_set.read();
+    let (_is_balances_addr_set) = is_balances_addr_set.read();
+    let (_is_gateway_addr_set) = is_gateway_addr_set.read();
+    assert _is_orders_addr_set + _is_limits_addr_set + _is_balances_addr_set + _is_gateway_addr_set == 0
     orders_addr.write(_orders_addr);
     limits_addr.write(_limits_addr);
     balances_addr.write(_balances_addr);
+    gateway_addr.write(_gateway_addr);
+    is_orders_addr_set.write(1);
+    is_limits_addr_set.write(1);
+    is_balances_addr_set.write(1);
+    is_gateway_addr_set.write(1);
     return ();
 }
 

@@ -33,9 +33,7 @@ func is_gateway_addr_set() -> (bool : felt) {
 }
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt
-) {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (owner : felt) {
     Ownable.initializer(owner);
     return ();
 }
@@ -43,19 +41,17 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // Set MarketsContract and GatewayContract address.
 // @dev Can only be called by contract owner and is write once.
 @external
-func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt, _gateway_addr : felt) {
+func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    _markets_addr : felt, _gateway_addr : felt
+) {
     Ownable.assert_only_owner();
     let (_is_markets_addr_set) = is_markets_addr_set.read();
     let (_is_gateway_addr_set) = is_gateway_addr_set.read();
-    if (_is_markets_addr_set + _is_gateway_addr_set == 0) {
-        markets_addr.write(_markets_addr);
-        gateway_addr.write(_gateway_addr);
-        is_markets_addr_set.write(1);
-        is_gateway_addr_set.write(1);
-        handle_revoked_refs();
-    } else {
-        handle_revoked_refs();
-    }
+    assert _is_markets_addr_set + _is_gateway_addr_set == 0
+    markets_addr.write(_markets_addr);
+    gateway_addr.write(_gateway_addr);
+    is_markets_addr_set.write(1);
+    is_gateway_addr_set.write(1);
     return ();
 }
 

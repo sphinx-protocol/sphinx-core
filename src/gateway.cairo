@@ -115,16 +115,16 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (_is_balances_addr_set) = is_balances_addr_set.read();
     let (_is_markets_addr_set) = is_markets_addr_set.read();
     let (_is_eth_remote_core_set) = is_eth_remote_core_set.read();
-    let (_is_eth_remote_eip_712_set) = is_is_eth_remote_eip_712_setgateway_addr_set.read();
-    if (_is_balances_addr_set + _is_markets_addr_set + _is_eth_remote_core_set + _is_eth_remote_eip_712_set == 0) {
-        balances_addr.write(_balances_addr);
-        markets_addr.write(_markets_addr);
-        l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
-        l2_eth_remote_eip_712_addr.write(_l2_eth_remote_eip_712_addr);
-        handle_revoked_refs();
-    } else {
-        handle_revoked_refs();
-    }
+    let (_is_eth_remote_eip_712_set) = is_eth_remote_eip_712_set.read();
+    assert _is_balances_addr_set + _is_markets_addr_set + _is_eth_remote_core_set + _is_eth_remote_eip_712_set == 0
+    balances_addr.write(_balances_addr);
+    markets_addr.write(_markets_addr);
+    l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
+    l2_eth_remote_eip_712_addr.write(_l2_eth_remote_eip_712_addr);
+    is_balances_addr_set.write(1);
+    is_markets_addr_set.write(1);
+    is_eth_remote_core_set.write(1);
+    is_eth_remote_eip_712_set.write(1);
     return ();
 }
 

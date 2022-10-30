@@ -30,9 +30,7 @@ func is_markets_addr_set() -> (bool : felt) {
 }
 
 @constructor
-func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt
-) {
+func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (owner : felt) {
     curr_limit_id.write(1);
     Ownable.initializer(owner);
     return ();
@@ -44,13 +42,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 func set_markets_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (_markets_addr : felt) {
     Ownable.assert_only_owner();
     let (is_set) = is_markets_addr_set.read();
-    if (is_set == 0) {
-        markets_addr.write(_markets_addr);
-        is_markets_addr_set.write(1);
-        handle_revoked_refs();
-    } else {
-        handle_revoked_refs();
-    }
+    assert is_set = 0;
+    markets_addr.write(_markets_addr);
+    is_markets_addr_set.write(1);
     return ();
 }
 
