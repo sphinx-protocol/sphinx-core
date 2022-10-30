@@ -5,15 +5,15 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from lib.openzeppelin.access.ownable.library import Ownable
-from src.dex.structs import User
+from src.utils.handle_revoked_refs import handle_revoked_refs
 
 // Stores user balances.
 @storage_var
-func account_balances(user : User, asset : felt) -> (amount : felt) {
+func account_balances(user : felt, asset : felt) -> (amount : felt) {
 }
 // Stores user balances locked in open orders.
 @storage_var
-func order_balances(user : User, asset : felt) -> (amount : felt) {
+func order_balances(user : felt, asset : felt) -> (amount : felt) {
 }
 // Stores contract address of MarketsContract.
 @storage_var
@@ -47,7 +47,7 @@ func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     Ownable.assert_only_owner();
     let (_is_markets_addr_set) = is_markets_addr_set.read();
     let (_is_gateway_addr_set) = is_gateway_addr_set.read();
-    assert _is_markets_addr_set + _is_gateway_addr_set == 0
+    assert _is_markets_addr_set + _is_gateway_addr_set = 0;
     markets_addr.write(_markets_addr);
     gateway_addr.write(_gateway_addr);
     is_markets_addr_set.write(1);
@@ -56,13 +56,13 @@ func set_addresses{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 }
 
 // Getter for user balances
-// @param user : User struct
+// @param user : User EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
 // @return amount : token balance
 @view
 func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : User, asset : felt, in_account : felt
+    user : felt, asset : felt, in_account : felt
 ) -> (amount : felt) {
     check_permissions();
     if (in_account == 1) {
@@ -75,13 +75,13 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 // Setter for user balances
-// @param user : User struct
+// @param user : User EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
 // @param amount : new token balance
 @external
 func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : User, asset : felt, in_account : felt, new_amount : felt
+    user : felt, asset : felt, in_account : felt, new_amount : felt
 ) {
     check_permissions();
     if (in_account == 1) {
@@ -94,14 +94,14 @@ func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 }
 
 // Transfer balance from one user to another. 
-// @param sender : sender (represented as User struct)
-// @param recipient : recipient (represented as User struct)
+// @param sender : sender EOA
+// @param recipient : recipient EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param amount : token balance
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    sender : User, recipient : User, asset : felt, amount : felt
+    sender : felt, recipient : felt, asset : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -119,13 +119,13 @@ func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 }
 
 // Transfer account balance to order balance.
-// @param user : User struct
+// @param user : User EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param amount : balance to transfer to open order
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : User, asset : felt, amount : felt
+    user : felt, asset : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -145,13 +145,13 @@ func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 }
 
 // Transfer order balance to account balance.
-// @param user : User struct
+// @param user : User EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param amount : balance to transfer from open order to account balance
 // @return success : 1 if successful, 0 otherwise
 @external
 func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : User, asset : felt, amount : felt
+    user : felt, asset : felt, amount : felt
 ) -> (success : felt) {
     alloc_locals;
     check_permissions();
@@ -186,13 +186,5 @@ func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     with_attr error_message("Caller does not have permission to call this function.") {
         assert 1 = 0;
     }
-    return ();
-}
-
-// Utility function to handle revoked implicit references.
-func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-    tempvar syscall_ptr=syscall_ptr;
-    tempvar pedersen_ptr=pedersen_ptr;
-    tempvar range_check_ptr=range_check_ptr;
     return ();
 }

@@ -1,11 +1,5 @@
 %lang starknet
 
-// Data structure representing a user
-struct User {
-    addr : felt,
-    chain_id : felt,
-}
-
 // Data structure representing an order.
 struct Order {
     id : felt,
@@ -16,7 +10,7 @@ struct Order {
     amount : felt,
     filled : felt,
     dt : felt,
-    owner : User,
+    owner : felt,
     limit_id : felt,
 }
 

@@ -6,7 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
 from src.dex.structs import Limit
 from lib.openzeppelin.access.ownable.library import Ownable
-// from src.dex.print import print_limit, print_limit_tree
+from src.utils.handle_revoked_refs import handle_revoked_refs
 
 // Stores details of limit prices as mapping.
 @storage_var
@@ -415,13 +415,5 @@ func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     with_attr error_message("Caller does not have permission to call this function.") {
         assert 1 = 0;
     }
-    return ();
-}
-
-// Utility function to handle revoked implicit references.
-func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-    tempvar syscall_ptr=syscall_ptr;
-    tempvar pedersen_ptr=pedersen_ptr;
-    tempvar range_check_ptr=range_check_ptr;
     return ();
 }

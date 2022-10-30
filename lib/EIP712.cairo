@@ -26,9 +26,8 @@ from starkware.cairo.common.uint256 import (
     uint256_mul,
     uint256_unsigned_div_rem,
 )
-
-from contracts.starknet.lib.math_utils import MathUtils
-from contracts.starknet.lib.array_utils import ArrayUtils
+from lib.math_utils import MathUtils
+from lib.array_utils import ArrayUtils
 
 const ETHEREUM_PREFIX = 0x1901;
 

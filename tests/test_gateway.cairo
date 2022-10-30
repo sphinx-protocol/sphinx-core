@@ -32,6 +32,9 @@ namespace IBalancesContract {
 
 @contract_interface
 namespace IMarketsContract {
+    // Set address.
+    func set_addresses(_orders_addr : felt, _limits_addr : felt, _balances_addr : felt, _gateway_addr : felt) {
+    }
     // Create a new market for exchanging between two assets.
     func create_market(base_asset : felt, quote_asset : felt) -> (new_market : Market) {
     }
@@ -40,7 +43,7 @@ namespace IMarketsContract {
 @contract_interface
 namespace IGatewayContract {
     // Set MarketsContract address
-    func set_markets_addr(_markets_addr : felt) {
+    func set_addresses(_balances_addr: felt, _markets_addr: felt, _l2_eth_remote_core_addr : felt, _l2_eth_remote_eip_712_addr : felt) {
     }
     // Submit a new bid (limit buy order) to a given market.
     func create_bid(base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt) {
@@ -60,11 +63,26 @@ namespace IGatewayContract {
     // Deposit ERC20 token to exchange
     func deposit(asset : felt, amount : felt) {
     }
-    // Relay remote deposit from other chain.
-    func remote_deposit(user : felt, chain_id : felt, asset : felt, amount : felt) {
-    }
     // Withdraw exchange balance as ERC20 token
     func withdraw(asset : felt, amount : felt) {
+    }
+    // Relay cross-chain request to submit a new bid (limit buy order) to a given market.
+    func remote_create_bid(user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt) {
+    }
+    // Relay cross-chain request to submit a new ask (limit sell order) to a given market.
+    func remote_create_ask(user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt) {
+    }
+    // Relay cross-chain request to submit a new market buy to a given market.
+    func remote_market_buy(user : felt, base_asset : felt, quote_asset : felt, amount : felt) {
+    }
+    // Relay cross-chain request to submit a new market sell to a given market.
+    func remote_market_sell(user : felt, ase_asset : felt, quote_asset : felt, amount : felt) {
+    }
+    // Relay cross-chain request to cancel an order and update limits, markets and balances.
+    func remote_cancel_order(user : felt, order_id : felt) {
+    }
+    // Relay remote deposit from other chain.
+    func remote_deposit(user : felt, asset : felt, amount : felt) {
     }
     // Relay remote withdraw request from other chain.
     func remote_withdraw(user : felt, chain_id : felt, asset : felt, amount : felt) {
@@ -79,9 +97,8 @@ func test_gateway{
 } () {
     alloc_locals;
     
-
     // Set contract addresses
-    const owner_addr = 31678259801237;
+    const owner = 31678259801237;
     const buyer = 123456789;
     const seller = 666666666;
     const base_asset = 123213123123;
@@ -93,30 +110,37 @@ func test_gateway{
     local balances_addr: felt;
     local markets_addr: felt;
     local gateway_addr: felt;
-    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.limits_addr = deploy_contract("./src/dex/limits.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.balances_addr = deploy_contract("./src/dex/balances.cairo", [ids.owner_addr]).contract_address %}
-    %{ ids.gateway_addr = deploy_contract("./src/gateway.cairo", [ids.owner_addr, ids.balances_addr]).contract_address %}
-    %{ ids.markets_addr = deploy_contract("./src/dex/markets.cairo", [ids.owner_addr, ids.gateway_addr, ids.orders_addr, ids.limits_addr, ids.balances_addr]).contract_address %}
+    local l2_eth_remote_core_addr: felt;
+    local l2_eth_remote_eip_712_addr: felt;
+    %{ ids.orders_addr = deploy_contract("./src/dex/orders.cairo", [ids.owner]).contract_address %}
+    %{ ids.limits_addr = deploy_contract("./src/dex/limits.cairo", [ids.owner]).contract_address %}
+    %{ ids.balances_addr = deploy_contract("./src/dex/balances.cairo", [ids.owner]).contract_address %}
+    %{ ids.gateway_addr = deploy_contract("./src/gateway.cairo", [ids.owner]).contract_address %}
+    %{ ids.markets_addr = deploy_contract("./src/dex/markets.cairo", [ids.owner]).contract_address %}
+    %{ ids.l2_eth_remote_core_addr = deploy_contract("./src/crosschain/l2_eth_remote_core.cairo", [ids.owner]).contract_address %}
+    %{ ids.l2_eth_remote_eip_712_addr = deploy_contract("./src/crosschain/l2_eth_remote_eip_712.cairo", [ids.owner]).contract_address %}
 
     // %{ print("orders_addr: {}, limits_addr: {}, balances_addr: {}, gateway_addr: {}, markets_addr: {}".format(ids.orders_addr, ids.limits_addr, ids.balances_addr, ids.gateway_addr, ids.markets_addr)) %}
 
     // Set contract addresses within deployed contracts
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.orders_addr) %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.orders_addr) %}
     IOrdersContract.set_markets_addr(orders_addr, markets_addr);
     %{ stop_prank_callable() %}
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.limits_addr) %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.limits_addr) %}
     ILimitsContract.set_markets_addr(limits_addr, markets_addr);
     %{ stop_prank_callable() %}
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.balances_addr) %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.balances_addr) %}
     IBalancesContract.set_addresses(balances_addr, markets_addr, gateway_addr);
     %{ stop_prank_callable() %}
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.set_markets_addr(gateway_addr, markets_addr);
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.markets_addr) %}
+    IMarketsContract.set_addresses(markets_addr, orders_addr, limits_addr, balances_addr, gateway_addr);
+    %{ stop_prank_callable() %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.gateway_addr) %}
+    IGatewayContract.set_addresses(gateway_addr, balances_addr, markets_addr, l2_eth_remote_core_addr, l2_eth_remote_eip_712_addr);
     %{ stop_prank_callable() %}
     
     // Create new market
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.markets_addr) %}
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.markets_addr) %}
     let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset);
     %{ stop_prank_callable() %}
 

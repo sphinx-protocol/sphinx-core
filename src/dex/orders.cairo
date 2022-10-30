@@ -5,8 +5,9 @@ from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
-from src.dex.structs import Order, User
+from src.dex.structs import Order
 from lib.openzeppelin.access.ownable.library import Ownable
+from src.utils.handle_revoked_refs import handle_revoked_refs
 
 // Stores orders in doubly linked lists.
 @storage_var
@@ -88,11 +89,11 @@ func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 // @param price : limit price
 // @param amount : amount of order
 // @param dt : datetime of order entry
-// @param owner : owner of order (User struct)
+// @param owner : owner of order
 // @param limit_id : ID of limit price corresponding to order
 @external
 func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    is_buy : felt, price : felt, amount : felt, dt : felt, owner : User, limit_id : felt
+    is_buy : felt, price : felt, amount : felt, dt : felt, owner : felt, limit_id : felt
 ) -> (new_order : Order) {
     alloc_locals;
     check_permissions();
@@ -428,9 +429,8 @@ func validate_idx{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
 
 // Utility function to generate an empty order.
 func gen_empty_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_order : Order*) {
-    tempvar empty_user: User* = new User(addr=0, chain_id=0);
     tempvar empty_order: Order* = new Order(
-        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=[empty_user], limit_id=0
+        id=0, next_id=0, prev_id=0, is_buy=0, price=0, amount=0, filled=0, dt=0, owner=0, limit_id=0
     );
     return (empty_order=empty_order);
 }
@@ -446,13 +446,5 @@ func check_permissions{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     with_attr error_message("Caller does not have permission to call this function.") {
         assert 1 = 0;
     }
-    return ();
-}
-
-// Utility function to handle revoked implicit references.
-func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-    tempvar syscall_ptr=syscall_ptr;
-    tempvar pedersen_ptr=pedersen_ptr;
-    tempvar range_check_ptr=range_check_ptr;
     return ();
 }

@@ -7,8 +7,9 @@ from starkware.cairo.common.uint256 import Uint256
 from lib.math_utils import MathUtils
 from starkware.starknet.common.syscalls import get_caller_address
 from lib.openzeppelin.access.ownable.library import Ownable
-from src.dex.structs import Market, User
+from src.dex.structs import Market
 from src.dex.events import log_create_bid
+from src.utils.handle_revoked_refs import handle_revoked_refs
 
 const MAX_FELT = 7237005577332262320683916064616567226037794236132864326206141556383157321729; // 2^252 + 17 x 2^192 + 1
 const ETH_GOERLI_CHAIN_ID = 1;
@@ -17,7 +18,7 @@ const STARKNET_GOERLI_CHAIN_ID = 2;
 @contract_interface
 namespace IL2EthRemoteCoreContract {
     // Handle request from L1 EthRemoteCore contract to withdraw assets from DEX.
-    func confirm_remote_withdraw(user_address: felt, token_address: felt, amount: felt) {
+    func remote_withdraw(user_address: felt, token_address: felt, amount: felt, chain_id : felt) {
     }
 }
 
@@ -27,29 +28,29 @@ namespace IMarketsContract {
     func get_market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
     }
     // Submit a new bid (limit buy order) to a given market.
-    func create_bid(caller : User, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_bid(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new ask (limit sell order) to a given market.
-    func create_ask(caller : User, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
+    func create_ask(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
     }
     // Submit a new market buy order to a given market.
-    func buy(caller : User, market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
+    func buy(caller : felt, market_id : felt, max_price : felt, amount : felt) -> (success : felt) {
     }
     // Submit a new market sell order to a given market.
-    func sell(caller : User, market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
+    func sell(caller : felt, market_id : felt, min_price : felt, amount : felt) -> (success : felt) {
     }
     // Delete an order and update limits, markets and balances.
-    func delete(caller : User, order_id : felt) -> (success : felt) {
+    func delete(caller : felt, order_id : felt) -> (success : felt) {
     }
 }
 
 @contract_interface
 namespace IBalancesContract {
     // Getter for user balances
-    func get_balance(user : User, asset : felt, in_account : felt) -> (amount : felt) {
+    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
     }
     // Setter for user balances
-    func set_balance(user : User, asset : felt, in_account : felt, new_amount : felt) {
+    func set_balance(user : felt, asset : felt, in_account : felt, new_amount : felt) {
     }
 }
 
@@ -116,7 +117,7 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     let (_is_markets_addr_set) = is_markets_addr_set.read();
     let (_is_eth_remote_core_set) = is_eth_remote_core_set.read();
     let (_is_eth_remote_eip_712_set) = is_eth_remote_eip_712_set.read();
-    assert _is_balances_addr_set + _is_markets_addr_set + _is_eth_remote_core_set + _is_eth_remote_eip_712_set == 0
+    assert _is_balances_addr_set + _is_markets_addr_set + _is_eth_remote_core_set + _is_eth_remote_eip_712_set = 0;
     balances_addr.write(_balances_addr);
     markets_addr.write(_markets_addr);
     l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
@@ -139,14 +140,13 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    create_bid_helper(caller, STARKNET_GOERLI_CHAIN_ID, base_asset, quote_asset, price, amount, post_only);
+    create_bid_helper(caller, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
 
 // Relay cross-chain request to submit a new bid (limit buy order) to a given market.
 // @dev Can only be called by L2EthRemoteCore contract
 // @param user : felt representation of user EOA
-// @param chain_id : ID of chain where funds originated
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
@@ -154,23 +154,22 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param post_only : 1 if create bid in post only mode, 0 otherwise
 @external
 func remote_create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    create_bid_helper(user, chain_id, base_asset, quote_asset, price, amount, post_only);
+    create_bid_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
 
 // Helper function to create bid.
 func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
-    let (success) = IMarketsContract.create_bid(_markets_addr, [caller], market_id, price, amount, post_only);
+    let (success) = IMarketsContract.create_bid(_markets_addr, user, market_id, price, amount, post_only);
     assert success = 1;
     return ();
 }
@@ -186,14 +185,13 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    create_ask_helper(caller, STARKNET_GOERLI_CHAIN_ID, base_asset, quote_asset, price, amount, post_only);
+    create_ask_helper(caller, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
 
 // Relay cross-chain request to submit a new ask (limit sell order) to a given market.
 // @dev Can only be called by L2EthRemoteCore contract
 // @param user : felt representation of user EOA
-// @param chain_id : ID of chain where funds originated
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
@@ -201,23 +199,22 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param post_only : 1 if create bid in post only mode, 0 otherwise
 @external
 func remote_create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    create_ask_helper(user, chain_id, base_asset, quote_asset, price, amount, post_only);
+    create_ask_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
 
 // Helper function to create ask.
 func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
-    let (success) = IMarketsContract.create_ask(_markets_addr, [caller], market_id, price, amount, post_only);
+    let (success) = IMarketsContract.create_ask(_markets_addr, user, market_id, price, amount, post_only);
     assert success = 1;
     return ();
 }
@@ -231,35 +228,33 @@ func market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
-    market_buy_helper(caller, STARKNET_GOERLI_CHAIN_ID, base_asset, quote_asset, amount);
+    market_buy_helper(caller, base_asset, quote_asset, amount);
     return ();
 }
 
 // Relay cross-chain request to submit a new market buy to a given market.
 // @param user : felt representation of user EOA
-// @param chain_id : ID of chain where funds originated
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param amount : order size in number of tokens of quote asset
 @external
 func remote_market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    market_buy_helper(user, chain_id, base_asset, quote_asset, amount);
+    market_buy_helper(user, base_asset, quote_asset, amount);
     return ();
 }
 
 // Helper function to create market buy order.
 func market_buy_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id); 
-    let (success) = IMarketsContract.buy(_markets_addr, [caller], market_id, MAX_FELT, amount);
+    let (success) = IMarketsContract.buy(_markets_addr, user, market_id, MAX_FELT, amount);
     assert success = 1;
     return ();
 }
@@ -273,35 +268,33 @@ func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
-    market_sell_helper(caller, STARKNET_GOERLI_CHAIN_ID, base_asset, quote_asset, amount);
+    market_sell_helper(caller, base_asset, quote_asset, amount);
     return ();
 }
 
 // Relay cross-chain request to submit a new market sell to a given market.
 // @param user : felt representation of user EOA
-// @param chain_id : ID of chain where funds originated
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param amount : order size in number of tokens of quote asset
 @external
 func remote_market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    market_sell_helper(user, chain_id, base_asset, quote_asset, amount);
+    market_sell_helper(user, base_asset, quote_asset, amount);
     return ();
 }
 
 // Helper function to create market sell order.
 func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (_markets_addr) = markets_addr.read();
     let (market_id) = IMarketsContract.get_market_ids(_markets_addr, base_asset, quote_asset);
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id); 
-    let (success) = IMarketsContract.sell(_markets_addr, [caller], market_id, MAX_FELT, amount);
+    let (success) = IMarketsContract.sell(_markets_addr, user, market_id, MAX_FELT, amount);
     assert success = 1;
     return ();
 }
@@ -312,26 +305,23 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
     let (caller) = get_caller_address();
     let (_markets_addr) = markets_addr.read();
-    tempvar user : User* = new User(addr=caller, chain_id=STARKNET_GOERLI_CHAIN_ID); 
-    let (success) = IMarketsContract.delete(_markets_addr, [user], order_id);
+    let (success) = IMarketsContract.delete(_markets_addr, caller, order_id);
     assert success = 1;
     return ();
 }
 
 // Relay cross-chain request to cancel an order and update limits, markets and balances.
 // @param user : felt representation of user EOA
-// @param chain_id : ID of chain where funds originated
 // @param order_id : ID of order
 @external
 func remote_cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, order_id : felt
+    user : felt, order_id : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
     let (_markets_addr) = markets_addr.read();
-    tempvar user_struct : User* = new User(addr=user, chain_id=chain_id); 
-    let (success) = IMarketsContract.delete(_markets_addr, [user_struct], order_id);
+    let (success) = IMarketsContract.delete(_markets_addr, user, order_id);
     assert success = 1;
     return ();
 }
@@ -352,35 +342,33 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (a
     let (success) = IERC20.transferFrom(asset, caller, contract_address, amount_u256);
     assert success = 1;
 
-    deposit_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount);
+    deposit_helper(caller, asset, amount);
     return ();
 }
 
 // Relay remote deposit from other chain.
 // @dev Only callable by L2EthRemoteCore contract
 // @param user : felt representation of depositor's EOA
-// @param chain_id : ID of chain where funds originated
 // @param asset : asset address
 // @param amount : amount to deposit
 @external
 func remote_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, chain_id : felt, asset : felt, amount : felt
+    user : felt, asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     assert caller = _l2_eth_remote_core_addr;
-    deposit_helper(user, chain_id, asset, amount);
+    deposit_helper(user, asset, amount);
     return ();
 }
 
 // Helper function to trigger deposit
 func deposit_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    user : felt, chain_id : felt, asset : felt, amount : felt
+    user : felt, asset : felt, amount : felt
 ) {
     let (_balances_addr) = balances_addr.read();
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
-    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, [caller], asset, 1);
-    IBalancesContract.set_balance(_balances_addr, [caller], asset, 1, user_dex_balance + amount);
+    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, user, asset, 1);
+    IBalancesContract.set_balance(_balances_addr, user, asset, 1, user_dex_balance + amount);
     return ();
 }
 
@@ -389,9 +377,10 @@ func deposit_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 // @param amount : amount to deposit
 @external
 func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (asset : felt, amount : felt) {
+    alloc_locals;
     let (_balances_addr) = balances_addr.read();
     let (caller) = get_caller_address();
-    withdraw_helper(caller, STARKNET_GOERLI_CHAIN_ID, asset, amount);
+    withdraw_helper(caller, asset, amount);
     let (contract_address) = get_contract_address();
     let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
     let (success) = IERC20.transferFrom(asset, contract_address, caller, amount_u256);
@@ -409,36 +398,31 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     user : felt, chain_id : felt, asset : felt, amount : felt
 ) {
+    alloc_locals;
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
+    assert caller = _l2_eth_remote_core_addr;
     if (chain_id == ETH_GOERLI_CHAIN_ID) {
-        withdraw_helper(user, chain_id, asset, amount);
+        withdraw_helper(user, asset, amount);
         IL2EthRemoteCoreContract.remote_withdraw(_l2_eth_remote_core_addr, user, chain_id, asset, amount);
+        handle_revoked_refs();
     } else {
         with_attr error_message("Chain ID not valid") {
             assert 1 = 0;
         }
+        handle_revoked_refs();
     }
     return ();
 }
 
 // Helper function to trigger withdrawal
 func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    user : felt, chain_id : felt, asset : felt, amount : felt
+    user : felt, asset : felt, amount : felt
 ) {
-    tempvar caller : User* = new User(addr=user, chain_id=chain_id);
-    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, [caller], asset, 1);
+    let (_balances_addr) = balances_addr.read();
+    let (user_dex_balance) = IBalancesContract.get_balance(_balances_addr, user, asset, 1);
     let is_sufficient = is_le(amount, user_dex_balance); 
     assert is_sufficient = 1;
-    IBalancesContract.set_balance(_balances_addr, [caller], asset, 1, user_dex_balance - amount);
-    return ();
-}
-
-// Utility function to handle revoked implicit references.
-func handle_revoked_refs{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-    tempvar syscall_ptr=syscall_ptr;
-    tempvar pedersen_ptr=pedersen_ptr;
-    tempvar range_check_ptr=range_check_ptr;
+    IBalancesContract.set_balance(_balances_addr, user, asset, 1, user_dex_balance - amount);
     return ();
 }
