@@ -1,8 +1,12 @@
 %lang starknet
 
+//
+// Events (for Apibara)
+//
+
 // Emit create market event.
 @event
-func log_create_market(id : felt, bid_tree_id : felt, ask_tree_id : felt, lowest_ask : felt, highest_bid : felt, base_asset : felt, quote_asset : felt, controller : felt) {
+func log_create_market(id : felt, bid_tree_id : felt, ask_tree_id : felt, lowest_ask : felt, highest_bid : felt, base_asset : felt, quote_asset : felt) {
 }
 
 // Emit create new bid.

@@ -37,5 +37,4 @@ struct Market {
     highest_bid : felt,
     base_asset : felt,
     quote_asset : felt,
-    controller : felt,
 }
