@@ -109,42 +109,42 @@ func authenticate{
 
     // Limit buy - post-only mode
     if (strategy == 0) {
-        IGatewayContract.remote_create_bid(_gateway_addr, user_address, base_token, quote_asset, price, amount, 1);
+        IGatewayContract.remote_create_bid(_gateway_addr, user_address, base_asset, quote_asset, price, amount, 1);
         handle_revoked_refs(); 
     } else {
         handle_revoked_refs(); 
     }
     // Limit buy - post-only mode disabled
     if (strategy == 1) {
-        IGatewayContract.remote_create_bid(_gateway_addr, user_address, base_token, quote_asset, price, amount, 0);
+        IGatewayContract.remote_create_bid(_gateway_addr, user_address, base_asset, quote_asset, price, amount, 0);
         handle_revoked_refs(); 
     } else {
         handle_revoked_refs(); 
     }
     // Limit sell - post-only mode
     if (strategy == 2) {
-        IGatewayContract.remote_create_ask(_gateway_addr, user_address, base_token, quote_asset, price, amount, 1);
+        IGatewayContract.remote_create_ask(_gateway_addr, user_address, base_asset, quote_asset, price, amount, 1);
         handle_revoked_refs(); 
     } else {
         handle_revoked_refs(); 
     }
     // Limit sell - post-only mode disabled
     if (strategy == 3) {
-        IGatewayContract.remote_create_ask(_gateway_addr, user_address, base_token, quote_asset, price, amount, 0);
+        IGatewayContract.remote_create_ask(_gateway_addr, user_address, base_asset, quote_asset, price, amount, 0);
         handle_revoked_refs(); 
     } else {
         handle_revoked_refs(); 
     }
     // Market buy
     if (strategy == 4) {
-        IGatewayContract.remote_market_buy(_gateway_addr, user_address, base_token, quote_asset, amount);
+        IGatewayContract.remote_market_buy(_gateway_addr, user_address, base_asset, quote_asset, amount);
         handle_revoked_refs();
     } else {
         handle_revoked_refs(); 
     }
     // Market sell
     if (strategy == 5) {
-        IGatewayContract.remote_market_sell(_gateway_addr, user_address, base_token, quote_asset, amount);
+        IGatewayContract.remote_market_sell(_gateway_addr, user_address, base_asset, quote_asset, amount);
         handle_revoked_refs();
     } else {
         handle_revoked_refs(); 
@@ -158,7 +158,7 @@ func authenticate{
     }
     // Send request to withdraw funds
     if (strategy == 7) {
-        IGatewayContract.remote_withdraw(_gateway_addr, user_address, chainId, base_token, amount); 
+        IGatewayContract.remote_withdraw(_gateway_addr, user_address, chainId, base_asset, amount); 
         handle_revoked_refs();
     } else {
         handle_revoked_refs(); 

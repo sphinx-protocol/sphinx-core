@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // @title EIP712 Library
-// @author Stark X - Remi
+// @author Stark X team
 // @reference: The code was inspired from the Snapshot X EIP 712 implementation. Source: https://github.com/snapshot-labs/sx-core/blob/05e0b1be3000d91d263fe85069f1bf571d4a5767/contracts/starknet/lib/eip712.cairo
 // @notice A library for verifying Ethereum EIP712 signatures on typed data
 // @dev Refer to the official EIP for more information: https://eips.ethereum.org/EIPS/eip-712
@@ -26,6 +26,7 @@ from starkware.cairo.common.uint256 import (
     uint256_mul,
     uint256_unsigned_div_rem,
 )
+
 from lib.math_utils import MathUtils
 from lib.array_utils import ArrayUtils
 
@@ -38,10 +39,10 @@ const ETHEREUM_PREFIX = 0x1901;
 const DOMAIN_HASH_HIGH = 0x86de7eea74b928333a5f774079924393;
 const DOMAIN_HASH_LOW = 0x01c2ce4f5a9b9bef74e2e79f59ff98f0;
 
-// keccak256("Order(bytes32 authenticator,bytes32 market,address author,address token,uint256 amount,uint256 price,uint256 strategy,uint256 salt)")
-// d4eeb39eaeef500fca5d670228cd9e51e7509352df8ac73b20f027951362af4c
-const ORDER_TYPE_HASH_HIGH = 0xd4eeb39eaeef500fca5d670228cd9e51;
-const ORDER_TYPE_HASH_LOW = 0xe7509352df8ac73b20f027951362af4c;
+// keccak256("Order(bytes32 authenticator,bytes32 base_asset,address author,bytes32 quote_asset,uint256 amount,uint256 price,uint256 strategy,uint256 chainId,uint256 orderId,uint256 salt)")
+// 0550b50ccb4923f2c00b60b587f75d1941bd48df545c986cae3c56523347126c
+const ORDER_TYPE_HASH_HIGH = 0x0550b50ccb4923f2c00b60b587f75d19;
+const ORDER_TYPE_HASH_LOW = 0x41bd48df545c986cae3c56523347126c;
 
 // @dev Signature salts store
 @storage_var
@@ -65,11 +66,13 @@ namespace EIP712 {
         price: felt,
         amount: felt,
         strategy: felt,
+        chainId: felt,
+        orderId: felt,
         r: Uint256,
         s: Uint256,
         v: felt,
         salt: Uint256,
-        market: felt,
+        base_asset: felt,
         calldata_len: felt,
         calldata: felt*,
     ) {
@@ -79,43 +82,46 @@ namespace EIP712 {
         MathUtils.assert_valid_uint256(s);
         MathUtils.assert_valid_uint256(salt);
 
-        let voter_address = calldata[0];
-        let token_address = calldata[1];
-        // let amount = calldata[2];
+        let user_address = calldata[0];
+        let quote_asset = calldata[1];
 
         let (authenticator_address) = get_contract_address();
         let (auth_address_u256) = MathUtils.felt_to_uint256(authenticator_address);
 
-        // Ensure voter has not already used this salt in a previous action
-        let (already_used) = EIP712_salts.read(voter_address, salt);
+        // Ensure user has not already used this salt in a previous action
+        let (already_used) = EIP712_salts.read(user_address, salt);
         with_attr error_message("EIP712: Salt already used") {
             assert already_used = 0;
         }
 
-        let (market_u256) = MathUtils.felt_to_uint256(market);
+        let (base_asset_u256) = MathUtils.felt_to_uint256(base_asset);
         let (amount_u256) = MathUtils.felt_to_uint256(amount);
         let (price_u256) = MathUtils.felt_to_uint256(price);
         let (strategy_u256) = MathUtils.felt_to_uint256(strategy);
+        let (chainId_u256) = MathUtils.felt_to_uint256(chainId);
+        let (orderId_u256) = MathUtils.felt_to_uint256(orderId);
 
-        let (voter_address_u256) = MathUtils.felt_to_uint256(voter_address);
-        let (token_address_u256) = MathUtils.felt_to_uint256(token_address);
+        let (user_address_u256) = MathUtils.felt_to_uint256(user_address);
+        let (quote_asset_u256) = MathUtils.felt_to_uint256(quote_asset);
 
         // Now construct the data hash (hashStruct)
         let (data: Uint256*) = alloc();
         assert data[0] = Uint256(ORDER_TYPE_HASH_LOW, ORDER_TYPE_HASH_HIGH);
         assert data[1] = auth_address_u256;
-        assert data[2] = market_u256;
-        assert data[3] = voter_address_u256;
-        assert data[4] = token_address_u256;
+        assert data[2] = base_asset_u256;
+        assert data[3] = user_address_u256;
+        assert data[4] = quote_asset_u256;
         assert data[5] = amount_u256;
         assert data[6] = price_u256;
         assert data[7] = strategy_u256;
-        assert data[8] = salt;
+        assert data[8] = chainId_u256;
+        assert data[9] = orderId_u256;       
+        assert data[10] = salt;
 
         let (local keccak_ptr: felt*) = alloc();
         let keccak_ptr_start = keccak_ptr;
 
-        let (hash_struct) = _get_keccak_hash{keccak_ptr=keccak_ptr}(9, data);
+        let (hash_struct) = _get_keccak_hash{keccak_ptr=keccak_ptr}(11, data);
 
         // Prepare the encoded data
         let (prepared_encoded: Uint256*) = alloc();
@@ -138,13 +144,13 @@ namespace EIP712 {
 
         // `v` is supposed to be `yParity` and not the `v` usually used in the Ethereum world (pre-EIP155).
         // We substract `27` because `v` = `{0, 1} + 27`
-        verify_eth_signature_uint256{keccak_ptr=keccak_ptr}(hash, r, s, v - 27, voter_address);
+        verify_eth_signature_uint256{keccak_ptr=keccak_ptr}(hash, r, s, v - 27, user_address);
 
         // Verify that all the previous keccaks are correct
         finalize_keccak(keccak_ptr_start, keccak_ptr);
 
         // Write the salt to prevent replay attack
-        EIP712_salts.write(voter_address, salt, 1);
+        EIP712_salts.write(user_address, salt, 1);
         return ();
     }
 
