@@ -76,6 +76,10 @@ namespace IERC20 {
     }
 }
 
+// 
+// Tests
+// 
+
 @external
 func test_gateway{
     syscall_ptr : felt*,

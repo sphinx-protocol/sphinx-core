@@ -26,6 +26,10 @@ namespace IGatewayContract {
     }
 }
 
+// 
+// Tests
+// 
+
 @external
 func test_l2_eth_remote_core{
     syscall_ptr : felt*,
