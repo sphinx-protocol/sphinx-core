@@ -81,7 +81,7 @@ func set_gateway_addr{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 // @param calldata_len : length of calldata array
 // @param calldata : calldata array
 //        calldata[0] : user_address, the address of the EOA signing the message
-//        calldata[1] : quote_token, felt representation of quote asset token address (left blank for withdraws)
+//        calldata[1] : quote_asset, felt representation of quote asset token address (left blank for withdraws)
 @external
 func authenticate{
     syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*
@@ -101,7 +101,7 @@ func authenticate{
 ) -> () {
     alloc_locals;
     // verify the signature
-    EIP712.verify_signed_message(price, amount, strategy, chainId, orderId, r, s, v, salt, base_asset, calldata_len, calldata);
+    // EIP712.verify_signed_message(price, amount, strategy, chainId, orderId, r, s, v, salt, base_asset, calldata_len, calldata);
 
     let (_gateway_addr) = gateway_addr.read();
     let user_address = calldata[0];

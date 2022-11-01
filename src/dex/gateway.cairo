@@ -152,8 +152,8 @@ func remote_create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     create_bid_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
@@ -196,8 +196,8 @@ func remote_create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     create_ask_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
@@ -235,8 +235,8 @@ func remote_market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     market_buy_helper(user, base_asset, quote_asset, amount);
     return ();
 }
@@ -274,8 +274,8 @@ func remote_market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     market_sell_helper(user, base_asset, quote_asset, amount);
     return ();
 }
@@ -285,7 +285,7 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.sell(user, market_id, MAX_FELT, amount);
+    let (success) = Markets.sell(user, market_id, 0, amount);
     assert success = 1;
     return ();
 }
@@ -308,8 +308,8 @@ func remote_cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     user : felt, order_id : felt
 ) {
     let (caller) = get_caller_address();
-    let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     let (success) = Markets.delete(user, order_id);
     assert success = 1;
     return ();
@@ -386,8 +386,9 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     alloc_locals;
     let (caller) = get_caller_address();
+    let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
+    assert caller = _l2_eth_remote_eip_712_addr;
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
     if (chain_id == ETH_GOERLI_CHAIN_ID) {
         withdraw_helper(user, asset, amount);
         IL2EthRemoteCoreContract.remote_withdraw(_l2_eth_remote_core_addr, user, chain_id, asset, amount);
