@@ -233,7 +233,6 @@ namespace ERC20 {
     func _transfer{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
         sender: felt, recipient: felt, amount: Uint256
     ) {
-        %{ print("sender: {}, recipient: {}, amount: ({}, {})".format(ids.sender, ids.recipient, ids.amount.low, ids.amount.high)) %}
         with_attr error_message("ERC20: amount is not a valid Uint256") {
             uint256_check(amount);  // almost surely not needed, might remove after confirmation
         }
@@ -286,7 +285,6 @@ namespace ERC20 {
         owner: felt, spender: felt, amount: Uint256
     ) {
         alloc_locals;
-        %{ print("owner: {}, spender: {}, amount: ({}, {})".format(ids.owner, ids.spender, ids.amount.low, ids.amount.high)) %}
         with_attr error_message("ERC20: amount is not a valid Uint256") {
             uint256_check(amount);  // almost surely not needed, might remove after confirmation
         }

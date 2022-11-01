@@ -112,7 +112,7 @@ func test_gateway{
     let (amount_u256) = MathUtils.felt_to_uint256(5000);
     IERC20.approve(base_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}
-     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.base_asset) %}
+    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.quote_asset) %}
     let (amount_u256) = MathUtils.felt_to_uint256(5000);
     IERC20.approve(quote_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}

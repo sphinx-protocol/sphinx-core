@@ -327,8 +327,6 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (a
     assert is_sufficient = 1;
 
     let (contract_address) = get_contract_address();
-    // let (approved_amount) = IERC20.allowance(asset, caller, contract_address);
-    // %{ print("approved_amount: ({}, {})".format(ids.approved_amount.low, ids.approved_amount.high)) %}
     let (success) = IERC20.transferFrom(asset, caller, contract_address, amount_u256);
     assert success = 1;
 
@@ -418,6 +416,7 @@ func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
 // @return amount : token balance
+@external
 func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     asset : felt, in_account : felt
 ) -> (amount : felt) {
