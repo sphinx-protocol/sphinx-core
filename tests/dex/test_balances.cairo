@@ -1,29 +1,7 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.dex.structs import Order
-
-@contract_interface
-namespace IBalancesContract {
-    // Set MarketsContract and GatewayContract address.
-    func set_addresses(_markets_addr : felt, _gateway_addr : felt) {
-    }
-    // Getter for user balances
-    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
-    }
-    // Setter for user balances
-    func set_balance(user : felt, asset : felt, in_account : felt, new_amount : felt) {
-    }
-    // Transfer balance from one user to another.
-    func transfer_balance(sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-    // Transfer account balance to order balance.
-    func transfer_to_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-    // Transfer order balance to account balance.
-    func transfer_from_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-}
+from src.dex.balances import Balances
 
 @external
 func test_balances{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () {
@@ -35,32 +13,21 @@ func test_balances{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     const user_a = 123456;
     const user_b = 456789;
 
-    local balances_addr: felt;
-    %{ ids.balances_addr = deploy_contract("./src/dex/balances.cairo", [ids.owner_addr]).contract_address %}
-
-    %{ stop_prank_callable = start_prank(ids.owner_addr, target_contract_address=ids.balances_addr) %}
-    IBalancesContract.set_addresses(balances_addr, markets_addr, gateway_addr);
-    %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.markets_addr, target_contract_address=ids.balances_addr) %}
-    IBalancesContract.set_balance(balances_addr, user_a, 1, 1, 1000);
-    let (amount) = IBalancesContract.get_balance(balances_addr, user_a, 1, 1);
+    Balances.set_balance(user_a, 1, 1, 1000);
+    let (amount) = Balances.get_balance(user_a, 1, 1);
     assert amount = 1000;
-    let (success) = IBalancesContract.transfer_balance(balances_addr, user_a, user_b, 1, 500);
+    let (success) = Balances.transfer_balance(user_a, user_b, 1, 500);
     assert success = 1;
-    %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.gateway_addr, target_contract_address=ids.balances_addr) %}
-    IBalancesContract.transfer_to_order(balances_addr, user_a, 1, 250);
-    let (locked) = IBalancesContract.get_balance(balances_addr, user_a, 1, 0);
+    Balances.transfer_to_order(user_a, 1, 250);
+    let (locked) = Balances.get_balance(user_a, 1, 0);
     assert locked = 250;
-    IBalancesContract.transfer_from_order(balances_addr, user_a, 1, 250);
+    Balances.transfer_from_order(user_a, 1, 250);
 
-    let (amount_sender) = IBalancesContract.get_balance(balances_addr, user_a, 1, 1);
-    let (amount_recipient) = IBalancesContract.get_balance(balances_addr, user_b, 1, 1);
+    let (amount_sender) = Balances.get_balance(user_a, 1, 1);
+    let (amount_recipient) = Balances.get_balance(user_b, 1, 1);
     assert amount_sender = 500;
     assert amount_recipient = 500;
-    %{ stop_prank_callable() %}
 
     return ();
 }

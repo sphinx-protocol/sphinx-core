@@ -1,42 +1,9 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from src.dex.balances import Balances
+from src.dex.markets import Markets
 from src.dex.structs import Market
-
-@contract_interface
-namespace IBalancesContract {
-    // Getter for user balances
-    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
-    }
-    // Setter for user balances
-    func set_balance(user : felt, asset : felt, in_account : felt, new_amount : felt) {
-    }
-    // Transfer balance from one user to another.
-    func transfer_balance(sender : felt, recipient : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-    // Transfer account balance to order balance.
-    func transfer_to_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-    // Transfer order balance to account balance.
-    func transfer_from_order(user : felt, asset : felt, amount : felt) -> (success : felt) {
-    }
-}
-
-@contract_interface
-namespace IMarketsContract {
-    // Create a new market for exchanging between two assets.
-    func create_market(base_asset : felt, quote_asset : felt) -> (new_market : Market) {
-    }
-    // Submit a new bid (limit buy order) to a given market.
-    func create_bid(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
-    }
-    // Submit a new ask (limit sell order) to a given market.
-    func create_ask(market_id : felt, price : felt, amount : felt, post_only : felt) -> (success : felt) {
-    }
-    // Delete an order and update limits, markets and balances.
-    func delete(order_id : felt) {
-    }
-}
 
 @external
 func test_markets{
@@ -45,8 +12,34 @@ func test_markets{
     range_check_ptr
 } () {
     alloc_locals;
+    
+    // Set contract addresses
+    const buyer = 123456789;
+    const seller = 666666666;
+    const base_asset = 123213123123;
+    const quote_asset = 788978978998;
 
-    // Migrated to test_gateway.cairo
+    // Create new market
+    let (new_market) = Markets.create_market(base_asset, quote_asset);
+
+    // Fund user balances (fake deposit)
+    Balances.set_balance(buyer, base_asset, 1, 5000);
+    Balances.set_balance(seller, quote_asset, 1, 5000);
+
+    // Place orders
+    Markets.create_bid(base_asset, quote_asset, 1, 1000, 1);
+    %{ stop_warp = warp(200) %}
+    Markets.create_bid(base_asset, quote_asset, 1, 1000, 1);
+    %{ stop_warp = warp(220) %}
+    Markets.create_bid(base_asset, quote_asset, 1, 200, 1);
+    %{ stop_warp = warp(321) %}
+
+    Markets.create_ask(base_asset, quote_asset, 1, 500, 0);
+    %{ stop_warp = warp(335) %}
+    Markets.create_ask(base_asset, quote_asset, 1, 300, 0);
+    %{ stop_warp = warp(350) %}
+    Markets.create_ask(base_asset, quote_asset, 1, 300, 0);
+    %{ stop_warp %}
 
     return ();
 }
