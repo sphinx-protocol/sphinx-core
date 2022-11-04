@@ -5,15 +5,23 @@ protostar_version = "0.4.1"
 libs_path = "lib"
 
 ["protostar.contracts"]
-orders = [
-    "src/tree/orders.cairo",
+gateway = [
+    "src/dex/gateway.cairo",
+    # "src/dex/markets.cairo",
+    # "src/dex/balances.cairo",
+    # "src/dex/limits.cairo",
+    # "src/dex/orders.cairo",
+    # "src/dex/structs.cairo",
+    # "src/dex/events.cairo",
 ]
-limits = [
-    "src/tree/limits.cairo",
+l2EthRemoteCore = [
+    "src/crosschain/l2_eth_remote_core.cairo",
 ]
-balances = [
-    "src/tree/balances.cairo",
+l2EthRemoteEIP712 = [
+    "src/crosschain/l2_eth_remote_eip_712.cairo",
 ]
-markets = [
-    "src/tree/markets.cairo",
-]
+
+["profile.testnet.protostar.deploy"]
+network="testnet"
+gateway-url="https://alpha4-2.starknet.io/"
+chain-id=1536727068981429685321
