@@ -1,0 +1,1 @@
+starknet deploy --no_wallet --contract ./build/gateway.json --network alpha-goerli --feeder_gateway_url  https://alpha4-2.starknet.io --inputs 2093101717867572091314490980361936991870830399016763450328630046935729101720 --gateway_url https://alpha4-2.starknet.io/gateway
