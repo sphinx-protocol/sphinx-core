@@ -4,6 +4,9 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.math_cmp import is_le
 from starkware.starknet.common.syscalls import get_caller_address
+from starkware.cairo.common.dict_access import DictAccess
+from starkware.cairo.common.default_dict import default_dict_new
+from starkware.cairo.common.dict import dict_write, dict_read
 from src.dex.structs import Limit
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
@@ -382,4 +385,99 @@ namespace Limits {
         );
         return (empty_limit=empty_limit);
     }
+
+    // Utility function to return all limit prices and volumes in a limit tree, from left to right order.
+    // @param tree_id : ID of tree to be viewed
+    // @return prices : array of limit prices
+    // @return amounts : array of order volumes at each limit price
+    // @return length : length of limit tree in number of nodes
+    func view_limit_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        tree_id : felt
+    ) -> (prices : felt*, amounts : felt*, length : felt) {
+        alloc_locals;
+
+        let (root_id) = roots.read(tree_id);
+        let (root) = limits.read(root_id);
+        let (prices : felt*) = alloc();
+        let (amounts : felt*) = alloc();
+
+        let (left) = limits.read(root.left_id);
+        let (left_length) = get_limit_tree_length(left);
+        view_limit_tree_helper{prices_ptr=prices, amounts_ptr=amounts}(node=root, idx=left_length);
+
+        let (length) = get_limit_tree_length(root);
+        return (prices=prices, amounts=amounts, length=length);
+    }
+
+    // Helper function to retrieve limit tree
+    // @param node : node in current iteration of function (starts from root)
+    // @param idx : node index for matching prices with amounts (unsorted)
+    func view_limit_tree_helper{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr, 
+        prices_ptr : felt*,
+        amounts_ptr : felt*,
+    } (node : Limit, idx : felt) {
+        alloc_locals;
+
+        if (node.left_id == 0) {
+            handle_revoked_refs_alt();
+        } else {
+            let (left) = limits.read(node.left_id);
+            view_limit_tree_helper(left, idx - 1);
+            handle_revoked_refs_alt();
+        }
+
+        if (node.right_id == 0) {
+            handle_revoked_refs_alt();
+        } else {
+            handle_revoked_refs_alt();
+            let (right) = limits.read(node.right_id);
+            let (right_left_child) = limits.read(right.left_id);
+            let (right_left_child_length) = get_limit_tree_length(right_left_child);
+            view_limit_tree_helper(right, idx + right_left_child_length + 1);
+        }
+
+        assert prices_ptr[idx] = node.price;
+        assert amounts_ptr[idx] = node.total_vol;
+
+        return ();
+    }
+
+    // Helper function to get length of limit tree
+    // @param node : node in current iteration of function (startsfrom root)
+    // @return length : length of limit tree
+    func get_limit_tree_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        node : Limit
+    ) -> (length : felt) {
+        alloc_locals;
+        if (node.id == 0) {
+            return (length=0);
+        } else {
+            let (left) = limits.read(node.left_id);
+            let (right) = limits.read(node.right_id);
+            let (left_length) = get_limit_tree_length(left);
+            let (right_length) = get_limit_tree_length(right);
+            return (length=1+left_length+right_length);
+        }
+    }
+
+    // Utility function to handle revoked implicit references.
+    // @dev Amended from regular version to include prices_ptr and amounts_ptr
+    func handle_revoked_refs_alt{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr,
+        prices_ptr : felt*,
+        amounts_ptr : felt*,
+    } () {
+        tempvar syscall_ptr=syscall_ptr;
+        tempvar pedersen_ptr=pedersen_ptr;
+        tempvar range_check_ptr=range_check_ptr;
+        tempvar prices_ptr=prices_ptr;
+        tempvar amounts_ptr=amounts_ptr;
+        return ();
+    }
+
 }

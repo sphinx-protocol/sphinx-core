@@ -124,6 +124,32 @@ func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
     return ();
 }
 
+// View bid or ask order book for a particular market
+// @param base_asset : felt representation of ERC20 base asset contract address
+// @param quote_asset : felt representation of ERC20 quote asset contract address
+// @param is_bid : 1 to view bid order book, 0 to view ask order book
+// @return prices_len : length of array of limit prices
+// @return prices : array of limit prices
+// @return amounts_len : length of array of volumes
+// @return amounts : array of volumes at each limit price
+@view
+func view_order_book{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    base_asset : felt, quote_asset : felt, is_bid : felt
+) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
+    alloc_locals;
+
+    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
+    let (market) = Markets.get_market(market_id);
+
+    if (is_bid == 1) {
+        let (prices, amounts, length) = Limits.view_limit_tree(market.bid_tree_id);
+        return (prices_len=length, prices=prices, amounts_len=length, amounts=amounts);
+    } else {
+        let (prices, amounts, length) = Limits.view_limit_tree(market.ask_tree_id);
+        return (prices_len=length, prices=prices, amounts_len=length, amounts=amounts);
+    }
+}
+
 // Submit a new bid (limit buy order) to a given market.
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address

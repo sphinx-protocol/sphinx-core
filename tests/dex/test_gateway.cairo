@@ -58,6 +58,9 @@ namespace IGatewayContract {
     // Getter for user balances
     func get_balance(asset : felt, in_account : felt) -> (amount : felt) {
     }
+    // View bid or ask order book for a particular market
+    func view_order_book(base_asset : felt, quote_asset : felt, is_bid : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
+    }
 }
 
 @contract_interface
@@ -157,5 +160,28 @@ func test_gateway{
     %{ print("buyer_base_account_balance: {}, buyer_base_locked_balance: {}, buyer_quote_account_balance: {}, buyer_quote_locked_balance: {}".format(ids.buyer_base_account_balance, ids.buyer_base_locked_balance, ids.buyer_quote_account_balance, ids.buyer_quote_locked_balance)) %}
     %{ print("seller_base_account_balance: {}, seller_base_locked_balance: {}, seller_quote_account_balance: {}, seller_quote_locked_balance: {}".format(ids.seller_base_account_balance, ids.seller_base_locked_balance, ids.seller_quote_account_balance, ids.seller_quote_locked_balance)) %}
 
+    let (bob_prices_len, bob_prices, bob_amounts_len, bob_amounts) = IGatewayContract.view_order_book(gateway_addr, base_asset, quote_asset, 1);
+    %{ print("Prices:") %}
+    print_list(bob_prices, bob_prices_len);
+    %{ print("Amounts:") %}
+    print_list(bob_amounts, bob_amounts_len);
+
+    return ();
+}
+
+func print_list{
+    syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+} (array : felt*, idx : felt) {
+    alloc_locals;
+
+    if (idx == 0) {
+        return ();
+    }
+    let value = array[idx - 1];
+    %{ print("[{}]: {}".format(ids.idx - 1, ids.value)) %}
+    print_list(array, idx - 1);
+    
     return ();
 }
