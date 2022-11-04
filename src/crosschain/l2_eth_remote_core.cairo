@@ -45,9 +45,9 @@ func gateway_addr() -> (res : felt) {
 func is_gateway_addr_set() -> (bool : felt) {
 }
 // Nonce
-@storage_var
-func nonce() -> (nonce : felt) {
-}
+// @storage_var
+// func nonce() -> (nonce : felt) {
+// }
 // Nullifiers
 @storage_var
 func nullifiers(nullifier : Uint256) -> (exist : felt) {
@@ -59,11 +59,11 @@ func nullifiers(nullifier : Uint256) -> (exist : felt) {
 
 // Log remote deposit 
 @event
-func log_remote_deposit(user_address : felt, token_address: felt, amount: felt, nonce: felt, chain_id : felt) {
+func log_remote_deposit(user_address : felt, token_address: felt, amount: felt, chain_id : felt) {
 }
 // Log remote withdraw
 @event
-func log_remote_withdraw(user_address : felt, token_address: felt, amount: felt, nonce: felt, chain_id : felt) {
+func log_remote_withdraw(user_address : felt, token_address: felt, amount: felt, chain_id : felt) {
 }
 
 // 
@@ -95,11 +95,11 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     return ();
 }
 
-@view
-func view_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () -> (current_nonce: felt) {
-    let (current_nonce) = nonce.read();
-    return (current_nonce=current_nonce);
-}
+// @view
+// func view_nonce{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} () -> (current_nonce: felt) {
+//     let (current_nonce) = nonce.read();
+//     return (current_nonce=current_nonce);
+// }
 
 // Handle request from L1 EthRemoteCore contract to deposit assets to DEX.
 // @l1_handler
@@ -110,7 +110,7 @@ func remote_deposit{
     range_check_ptr,
     bitwise_ptr: BitwiseBuiltin*
 } (
-    from_address: felt, user_address: felt, token_address: felt, amount: felt, nonce: felt, chain_id : felt
+    from_address: felt, user_address: felt, token_address: felt, amount: felt, chain_id : felt
 ) -> (success : felt) {
     alloc_locals;
 
@@ -121,20 +121,20 @@ func remote_deposit{
     let (user_address_u256) = MathUtils.felt_to_uint256(user_address);
     let (token_address_u256) = MathUtils.felt_to_uint256(token_address);
     let (amount_u256) = MathUtils.felt_to_uint256(amount);
-    let (nonce_u256) = MathUtils.felt_to_uint256(nonce);
+    // let (nonce_u256) = MathUtils.felt_to_uint256(nonce);
     let (chain_id_u256) = MathUtils.felt_to_uint256(chain_id);
 
     let (payload_data : Uint256*) = alloc();
     assert payload_data[0] = user_address_u256;
     assert payload_data[1] = token_address_u256;
     assert payload_data[2] = amount_u256;
-    assert payload_data[3] = nonce_u256;
-    assert payload_data[4] = chain_id_u256;
+    // assert payload_data[3] = nonce_u256;
+    assert payload_data[3] = chain_id_u256;
 
     let (local keccak_ptr: felt*) = alloc();
     let keccak_ptr_start = keccak_ptr;
 
-    let (nullifier) = _get_keccak_hash{keccak_ptr=keccak_ptr}(5, payload_data);
+    let (nullifier) = _get_keccak_hash{keccak_ptr=keccak_ptr}(4, payload_data);
     let (exist) = nullifiers.read(nullifier);
 
     // Prevent double deposit
@@ -145,7 +145,7 @@ func remote_deposit{
     
     let (_gateway_addr) = gateway_addr.read();
     IGatewayContract.remote_deposit(_gateway_addr, user_address, token_address, amount); 
-    log_remote_deposit.emit(user_address, token_address, amount, nonce, chain_id);
+    log_remote_deposit.emit(user_address, token_address, amount, chain_id);
 
     return (success=1);
 }
@@ -159,25 +159,25 @@ func remote_withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     let (_gateway_addr) = gateway_addr.read();
     assert caller = _gateway_addr;
 
-    let (current_nonce) = nonce.read();
+    // let (current_nonce) = nonce.read();
 
     let (message_payload : felt*) = alloc();
     assert message_payload[0] = user_address;
     assert message_payload[1] = token_address;
     assert message_payload[2] = amount;
-    assert message_payload[3] = current_nonce;
-    assert message_payload[4] = chain_id;
+    // assert message_payload[3] = current_nonce;
+    assert message_payload[3] = chain_id;
 
-    nonce.write(current_nonce + 1);
+    // nonce.write(current_nonce + 1);
 
     let (_l1_eth_remote_address) = l1_eth_remote_address.read();
     send_message_to_l1(
         to_address=_l1_eth_remote_address,
-        payload_size=5,
+        payload_size=4,
         payload=message_payload,
     );
 
-    log_remote_withdraw.emit(user_address, token_address, amount, current_nonce, chain_id);
+    log_remote_withdraw.emit(user_address, token_address, amount, chain_id);
 
     return ();
 }
