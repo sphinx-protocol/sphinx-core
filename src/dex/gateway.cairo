@@ -440,15 +440,15 @@ func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 }
 
 // Getter for user balances
+// @param user : felt representation of user's EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
 // @return amount : token balance
 @view
 func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    asset : felt, in_account : felt
+    user : felt, asset : felt, in_account : felt
 ) -> (amount : felt) {
     alloc_locals;
-    let (caller) = get_caller_address();
-    let (amount) = Balances.get_balance(caller, asset, in_account);
+    let (amount) = Balances.get_balance(user, asset, in_account);
     return (amount=amount);
 }

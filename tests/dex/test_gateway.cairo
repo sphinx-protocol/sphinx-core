@@ -104,8 +104,8 @@ func test_gateway{
     local gateway_addr : felt;
     %{ ids.l2_eth_remote_core_addr = deploy_contract("./src/crosschain/l2_eth_remote_core.cairo", [ids.owner]).contract_address %}
     %{ ids.l2_eth_remote_eip_712_addr = deploy_contract("./src/crosschain/l2_eth_remote_eip_712.cairo", [ids.owner]).contract_address %}
-    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, 1, 100000, 100000, ids.buyer]).contract_address %}
-    %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, 2, 100000, 100000, ids.seller]).contract_address %}
+    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, 1, 1000000 * 1000000000000000000, 0, ids.buyer]).contract_address %}
+    %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, 2, 1000000 * 1000000000000000000, 0, ids.seller]).contract_address %}
     %{ ids.gateway_addr = deploy_contract("./src/dex/gateway.cairo", [ids.owner]).contract_address %}
 
     // Set contract addresses and create new market
@@ -116,31 +116,36 @@ func test_gateway{
 
     // Fund user balances (deposit)
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.base_asset) %}
-    let (amount_u256) = MathUtils.felt_to_uint256(5000);
+    let (amount_u256) = MathUtils.felt_to_uint256(10000 * 1000000000000000000);
     IERC20.approve(base_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.quote_asset) %}
-    let (amount_u256) = MathUtils.felt_to_uint256(5000);
+    let (amount_u256) = MathUtils.felt_to_uint256(200 * 1000000000000000000);
     IERC20.approve(quote_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.deposit(gateway_addr, base_asset, 5000);
+    IGatewayContract.deposit(gateway_addr, base_asset, 10000 * 1000000000000000000);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.deposit(gateway_addr, quote_asset, 5000);
+    IGatewayContract.deposit(gateway_addr, quote_asset, 200 * 1000000000000000000);
     %{ stop_prank_callable() %}
+
+    %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
+    let (deposited) = IGatewayContract.get_balance(gateway_addr, base_asset, 1);
+    %{ stop_prank_callable() %}
+    %{ print(ids.deposited) %}
 
     // Place bids as buyer
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1, 1000, 1);
-    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1, 1000, 1);
-    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1, 200, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 200 * 1000000000000000, 1);
     %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1, 500, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1, 300, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1, 300, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1630 * 1000000000000000000, 500 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 300 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 300 * 1000000000000000, 0);
     %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
