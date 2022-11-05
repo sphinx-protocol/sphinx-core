@@ -443,7 +443,7 @@ func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
 // @return amount : token balance
-@external
+@view
 func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     asset : felt, in_account : felt
 ) -> (amount : felt) {

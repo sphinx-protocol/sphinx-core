@@ -7,12 +7,6 @@ libs_path = "lib"
 ["protostar.contracts"]
 gateway = [
     "src/dex/gateway.cairo",
-    # "src/dex/markets.cairo",
-    # "src/dex/balances.cairo",
-    # "src/dex/limits.cairo",
-    # "src/dex/orders.cairo",
-    # "src/dex/structs.cairo",
-    # "src/dex/events.cairo",
 ]
 l2EthRemoteCore = [
     "src/crosschain/l2_eth_remote_core.cairo",
@@ -20,8 +14,6 @@ l2EthRemoteCore = [
 l2EthRemoteEIP712 = [
     "src/crosschain/l2_eth_remote_eip_712.cairo",
 ]
-
-["profile.testnet.protostar.deploy"]
-network="testnet"
-gateway-url="https://alpha4-2.starknet.io/"
-chain-id=1536727068981429685321
+ERC20 = [
+    "src/ERC20/ERC20.cairo",
+]
