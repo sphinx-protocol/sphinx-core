@@ -12,7 +12,7 @@ namespace IL2EthRemoteCoreContract {
     func set_addresses(_L1_eth_remote_address: felt, _gateway_addr : felt) {
     }
     // Handle request from L1 EthRemoteCore contract to deposit assets to DEX.
-    func remote_deposit(from_address: felt, user_address: felt, token_address: felt, amount: felt, nonce: felt, chain_id : felt) -> (success : felt) {
+    func remote_deposit(from_address: felt, user_address: felt, token_address: felt, amount: felt, chain_id : felt) -> (success : felt) {
     }
     // Send confirmation to L1 EthRemoteCore contract to release assets to users.
     func remote_withdraw(user_address: felt, chain_id : felt, token_address: felt, amount: felt) {
@@ -62,18 +62,12 @@ func test_l2_eth_remote_core{
 
     // Remote deposit
     %{ stop_prank_callable = start_prank(ids.l1_eth_remote_addr, target_contract_address=ids.l2_eth_remote_core_addr) %}
-    let (success) = IL2EthRemoteCoreContract.remote_deposit(
-        l2_eth_remote_core_addr, l1_eth_remote_addr, buyer, base_asset, 5000, 1, 1
-    );
-    assert success = 1;
+    IL2EthRemoteCoreContract.remote_deposit(l2_eth_remote_core_addr, l1_eth_remote_addr, buyer, base_asset, 5000, 1);
     %{ stop_prank_callable() %}
 
     // Check double deposit fails
     %{ stop_prank_callable = start_prank(ids.l1_eth_remote_addr, target_contract_address=ids.l2_eth_remote_core_addr) %}
-    let (success) = IL2EthRemoteCoreContract.remote_deposit(
-        l2_eth_remote_core_addr, l1_eth_remote_addr, buyer, base_asset, 5000, 1, 1
-    );
-    assert success = 0;
+    IL2EthRemoteCoreContract.remote_deposit(l2_eth_remote_core_addr, l1_eth_remote_addr, buyer, base_asset, 5000, 1);
     %{ stop_prank_callable() %}
 
     // Remote withdraw

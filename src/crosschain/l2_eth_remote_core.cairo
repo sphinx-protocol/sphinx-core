@@ -87,7 +87,9 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     Ownable.assert_only_owner();
     let (is_remote_set) = is_l1_eth_remote_addr_set.read();
     let (is_gateway_set) = is_gateway_addr_set.read();
-    assert is_remote_set + is_gateway_set = 0;
+    // with_attr error_message("[L2EthRemoteCore] set_addresses > Addresses already set") {
+    //     assert is_remote_set + is_gateway_set = 0;
+    // } 
     l1_eth_remote_address.write(_l1_eth_remote_address);
     gateway_addr.write(_gateway_addr);
     is_l1_eth_remote_addr_set.write(1);
@@ -102,8 +104,7 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 // }
 
 // Handle request from L1 EthRemoteCore contract to deposit assets to DEX.
-// @l1_handler
-@external
+@l1_handler
 func remote_deposit{
     syscall_ptr : felt*,
     pedersen_ptr : HashBuiltin*,
@@ -111,43 +112,43 @@ func remote_deposit{
     bitwise_ptr: BitwiseBuiltin*
 } (
     from_address: felt, user_address: felt, token_address: felt, amount: felt, chain_id : felt
-) -> (success : felt) {
+) {
     alloc_locals;
 
     // Make sure the message was sent by the intended L1 contract.
     let (_l1_eth_remote_address) = l1_eth_remote_address.read();
-    assert from_address = _l1_eth_remote_address;
+    with_attr error_message("[L2EthRemoteCore] remote_deposit > Only callable by L1EthRemote") {
+        assert from_address = _l1_eth_remote_address;   
+    } 
 
     let (user_address_u256) = MathUtils.felt_to_uint256(user_address);
     let (token_address_u256) = MathUtils.felt_to_uint256(token_address);
     let (amount_u256) = MathUtils.felt_to_uint256(amount);
-    // let (nonce_u256) = MathUtils.felt_to_uint256(nonce);
     let (chain_id_u256) = MathUtils.felt_to_uint256(chain_id);
 
     let (payload_data : Uint256*) = alloc();
     assert payload_data[0] = user_address_u256;
     assert payload_data[1] = token_address_u256;
     assert payload_data[2] = amount_u256;
-    // assert payload_data[3] = nonce_u256;
     assert payload_data[3] = chain_id_u256;
 
     let (local keccak_ptr: felt*) = alloc();
     let keccak_ptr_start = keccak_ptr;
 
-    let (nullifier) = _get_keccak_hash{keccak_ptr=keccak_ptr}(4, payload_data);
-    let (exist) = nullifiers.read(nullifier);
+    // let (nullifier) = _get_keccak_hash{keccak_ptr=keccak_ptr}(4, payload_data);
+    // let (exist) = nullifiers.read(nullifier);
 
-    // Prevent double deposit
-    if (exist == 1) {
-        return (success=0);
-    }
-    nullifiers.write(nullifier, 1);
+    // // Prevent double deposit
+    // if (exist == 1) {
+    //     return (success=0);
+    // }
+    // nullifiers.write(nullifier, 1);
     
     let (_gateway_addr) = gateway_addr.read();
     IGatewayContract.remote_deposit(_gateway_addr, user_address, token_address, amount); 
     log_remote_deposit.emit(user_address, token_address, amount, chain_id);
 
-    return (success=1);
+    return ();
 }
 
 // Send confirmation to L1 EthRemoteCore contract to release assets to users.
@@ -157,7 +158,9 @@ func remote_withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
 ) {
     let (caller) = get_caller_address();
     let (_gateway_addr) = gateway_addr.read();
-    assert caller = _gateway_addr;
+    with_attr error_message("[L2EthRemoteCore] remote_withdraw > Only callable by GatewayContract") {
+        assert caller = _gateway_addr;
+    } 
 
     // let (current_nonce) = nonce.read();
 
@@ -165,10 +168,7 @@ func remote_withdraw{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_che
     assert message_payload[0] = user_address;
     assert message_payload[1] = token_address;
     assert message_payload[2] = amount;
-    // assert message_payload[3] = current_nonce;
     assert message_payload[3] = chain_id;
-
-    // nonce.write(current_nonce + 1);
 
     let (_l1_eth_remote_address) = l1_eth_remote_address.read();
     send_message_to_l1(

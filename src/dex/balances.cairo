@@ -72,14 +72,13 @@ namespace Balances {
         let (sender_balance) = get_balance(sender, asset, 1);
         let is_sufficient = is_le(amount, sender_balance);
         let is_positive = is_le(1, amount);
-        if (is_sufficient + is_positive == 2) {
-            let (recipient_balance) = get_balance(recipient, asset, 1);
-            set_balance(sender, asset, 1, sender_balance - amount);
-            set_balance(recipient, asset, 1, recipient_balance + amount);
-            return (success=1);
-        } else {
-            return (success=0);
+        with_attr error_message("[Balances] transfer_balance > Balance must be sufficient and positive, sender balance is {sender_balance} but requested transfer of {amount}") {
+            assert is_sufficient + is_positive = 2;
         }
+        let (recipient_balance) = get_balance(recipient, asset, 1);
+        set_balance(sender, asset, 1, sender_balance - amount);
+        set_balance(recipient, asset, 1, recipient_balance + amount);
+        return (success=1);
     }
 
     // Transfer account balance to order balance.

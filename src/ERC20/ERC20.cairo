@@ -109,3 +109,11 @@ func decreaseAllowance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     ERC20.decrease_allowance(spender, subtracted_value);
     return (TRUE,);
 }
+
+@external
+func mint{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    amount : Uint256, recipient: felt
+) {
+    ERC20._mint(recipient, amount);
+    return ();
+}

@@ -228,7 +228,8 @@ namespace Markets {
             assert update_market_success = 1;
             handle_revoked_refs();
         }
-        let (update_balance_success) = Balances.transfer_to_order(caller, market.base_asset, amount);
+        let (order_size, _) = unsigned_div_rem(amount * price, 1000000000000000000);
+        let (update_balance_success) = Balances.transfer_to_order(caller, market.base_asset, order_size);
         assert update_balance_success = 1;
 
         log_create_bid.emit(
@@ -260,9 +261,11 @@ namespace Markets {
         }
 
         // If bid exists and price lower than highest bid, place market sell
-        if (highest_bid.id == 1) {
-            let is_market_order = is_le(price, highest_bid.price);
+        if (highest_bid.id == 0) {
             handle_revoked_refs();
+        } else {
+            handle_revoked_refs();
+            let is_market_order = is_le(price, highest_bid.price);
             if (is_market_order == 1) {
                 if (post_only == 0) {
                     let (sell_order_success) = sell(caller, market.id, price, amount);
@@ -276,8 +279,6 @@ namespace Markets {
             } else {
                 handle_revoked_refs();
             }
-        } else {
-            handle_revoked_refs();
         }
 
         // Otherwise, place limit sell order
@@ -360,7 +361,7 @@ namespace Markets {
 
         let (market) = markets.read(market_id);
         let (lowest_ask) = Orders.get_order(market.lowest_ask);
-        let (base_amount, _) = unsigned_div_rem(amount, lowest_ask.price);
+        let (base_amount, _) = unsigned_div_rem(amount * lowest_ask.price, 1000000000000000000);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         let is_sufficient = is_le(base_amount, account_balance);
         let is_positive = is_le(1, amount);
@@ -398,8 +399,8 @@ namespace Markets {
             // Partial fill of order
             Orders.set_filled(lowest_ask.id, amount);
             let (transfer_balance_success_1) = Balances.transfer_from_order(lowest_ask.owner, market.quote_asset, amount);
-            let (base_amount, _) = unsigned_div_rem(amount, lowest_ask.price);
-            let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, base_amount);
+            let (updated_base_amount, _) = unsigned_div_rem(amount * lowest_ask.price, 1000000000000000000);
+            let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             assert transfer_balance_success_1 = 1;
             let (transfer_balance_success_2) = Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, amount);
             assert transfer_balance_success_2 = 1;
@@ -413,8 +414,8 @@ namespace Markets {
             // Fill entire order
             Orders.set_filled(lowest_ask.id, lowest_ask.amount);
             delete(caller, lowest_ask.id);
-            let (base_amount, _) = unsigned_div_rem(lowest_ask.amount - lowest_ask.filled, lowest_ask.price);
-            let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, base_amount);
+            let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, 1000000000000000000);
+            let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             assert transfer_balance_success_1 = 1;
             let (transfer_balance_success_2) = Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, amount);
             assert transfer_balance_success_2 = 1;
@@ -479,7 +480,7 @@ namespace Markets {
             // Partial fill of order
             Orders.set_filled(highest_bid.id, amount);
             let (transfer_balance_success_1) = Balances.transfer_from_order(highest_bid.owner, market.base_asset, amount);
-            let (base_amount, _) = unsigned_div_rem(amount, highest_bid.price);
+            let (base_amount, _) = unsigned_div_rem(amount * highest_bid.price, 1000000000000000000);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, amount);
             assert transfer_balance_success_1 = 1;
             let (transfer_balance_success_2) = Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, base_amount);
@@ -496,7 +497,7 @@ namespace Markets {
             // Fill entire order
             Orders.set_filled(highest_bid.id, highest_bid.amount);
             delete(caller, highest_bid.id);
-            let (base_amount, _) = unsigned_div_rem(highest_bid.amount - highest_bid.filled, highest_bid.price);
+            let (base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, 1000000000000000000);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, amount);
             assert transfer_balance_success_1 = 1;
             let (transfer_balance_success_2) = Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, base_amount);

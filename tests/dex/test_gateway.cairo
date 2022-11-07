@@ -56,7 +56,7 @@ namespace IGatewayContract {
     func remote_withdraw(user : felt, chain_id : felt, asset : felt, amount : felt) {
     }
     // Getter for user balances
-    func get_balance(asset : felt, in_account : felt) -> (amount : felt) {
+    func get_balance(user : felt, asset : felt, in_account : felt) -> (amount : felt) {
     }
     // View bid or ask order book for a particular market
     func view_order_book(base_asset : felt, quote_asset : felt, is_bid : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
@@ -120,56 +120,63 @@ func test_gateway{
     IERC20.approve(base_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.quote_asset) %}
-    let (amount_u256) = MathUtils.felt_to_uint256(200 * 1000000000000000000);
+    let (amount_u256) = MathUtils.felt_to_uint256(500 * 1000000000000000000);
     IERC20.approve(quote_asset, gateway_addr, amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
     IGatewayContract.deposit(gateway_addr, base_asset, 10000 * 1000000000000000000);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.deposit(gateway_addr, quote_asset, 200 * 1000000000000000000);
+    IGatewayContract.deposit(gateway_addr, quote_asset, 500 * 1000000000000000000);
     %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    let (deposited) = IGatewayContract.get_balance(gateway_addr, base_asset, 1);
-    %{ stop_prank_callable() %}
-    %{ print(ids.deposited) %}
 
     // Place bids as buyer
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 500 * 1000000000000000, 1);
     IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 1000 * 1000000000000000, 1);
     IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 200 * 1000000000000000, 1);
     %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1630 * 1000000000000000000, 500 * 1000000000000000, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 300 * 1000000000000000, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 300 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 400 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 300 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 300 * 1000000000000000, 0);
     %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    let (buyer_base_account_balance) = IGatewayContract.get_balance(gateway_addr, base_asset, 1);
-    let (buyer_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, base_asset, 0);
-    let (buyer_quote_account_balance) = IGatewayContract.get_balance(gateway_addr, quote_asset, 1);
-    let (buyer_quote_locked_balance) = IGatewayContract.get_balance(gateway_addr, quote_asset, 0);
+     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 1);
     %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    let (seller_base_account_balance) = IGatewayContract.get_balance(gateway_addr, base_asset, 1);
-    let (seller_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, base_asset, 0);
-    let (seller_quote_account_balance) = IGatewayContract.get_balance(gateway_addr, quote_asset, 1);
-    let (seller_quote_locked_balance) = IGatewayContract.get_balance(gateway_addr, quote_asset, 0);
+    %{ stop_prank_callable = start_prank(ids.l2_eth_remote_eip_712_addr, target_contract_address=ids.gateway_addr) %}
+    IGatewayContract.remote_create_bid(gateway_addr, buyer, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 0);
     %{ stop_prank_callable() %}
+
+    let (buyer_base_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 1);
+    let (buyer_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 0);
+    let (buyer_quote_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, quote_asset, 1);
+    let (buyer_quote_locked_balance) = IGatewayContract.get_balance(gateway_addr, buyer, quote_asset, 0);
+
+    let (seller_base_account_balance) = IGatewayContract.get_balance(gateway_addr, seller, base_asset, 1);
+    let (seller_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, seller, base_asset, 0);
+    let (seller_quote_account_balance) = IGatewayContract.get_balance(gateway_addr, seller, quote_asset, 1);
+    let (seller_quote_locked_balance) = IGatewayContract.get_balance(gateway_addr, seller, quote_asset, 0);
 
     %{ print("buyer_base_account_balance: {}, buyer_base_locked_balance: {}, buyer_quote_account_balance: {}, buyer_quote_locked_balance: {}".format(ids.buyer_base_account_balance, ids.buyer_base_locked_balance, ids.buyer_quote_account_balance, ids.buyer_quote_locked_balance)) %}
     %{ print("seller_base_account_balance: {}, seller_base_locked_balance: {}, seller_quote_account_balance: {}, seller_quote_locked_balance: {}".format(ids.seller_base_account_balance, ids.seller_base_locked_balance, ids.seller_quote_account_balance, ids.seller_quote_locked_balance)) %}
 
     let (bob_prices_len, bob_prices, bob_amounts_len, bob_amounts) = IGatewayContract.view_order_book(gateway_addr, base_asset, quote_asset, 1);
+    %{ "Bid order book" %}
     %{ print("Prices:") %}
     print_list(bob_prices, bob_prices_len);
     %{ print("Amounts:") %}
     print_list(bob_amounts, bob_amounts_len);
+
+    let (aob_prices_len, aob_prices, aob_amounts_len, aob_amounts) = IGatewayContract.view_order_book(gateway_addr, base_asset, quote_asset, 0);
+    %{ "Ask order book" %}
+    %{ print("Prices:") %}
+    print_list(aob_prices, aob_prices_len);
+    %{ print("Amounts:") %}
+    print_list(aob_amounts, aob_amounts_len);
 
     return ();
 }

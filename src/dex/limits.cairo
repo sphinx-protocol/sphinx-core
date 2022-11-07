@@ -108,7 +108,7 @@ namespace Limits {
 
         // Diagnostics
         // let (new_root) = limits.read(root_id);
-        // print_limit_tree(new_root, 1);
+        // print_limit_tree(inserted, 1);
 
         return (new_limit=inserted);
     }
@@ -138,7 +138,8 @@ namespace Limits {
                 );
                 limits.write(curr.id, [new_curr]);
                 handle_revoked_refs();
-                return (new_limit=[new_curr]);
+                let (new_limit) = limits.read(new_limit_id);
+                return (new_limit=new_limit);
             } else {
                 let (curr_right) = limits.read(curr.right_id);
                 handle_revoked_refs();
@@ -156,7 +157,8 @@ namespace Limits {
                 );
                 limits.write(curr.id, [new_curr]);
                 handle_revoked_refs();
-                return (new_limit=[new_curr]);
+                let (new_limit) = limits.read(new_limit_id);
+                return (new_limit=new_limit);
             } else {
                 let (curr_left) = limits.read(curr.left_id);
                 handle_revoked_refs();
@@ -398,6 +400,7 @@ namespace Limits {
 
         let (root_id) = roots.read(tree_id);
         let (root) = limits.read(root_id);
+
         let (prices : felt*) = alloc();
         let (amounts : felt*) = alloc();
 
@@ -425,7 +428,9 @@ namespace Limits {
             handle_revoked_refs_alt();
         } else {
             let (left) = limits.read(node.left_id);
-            view_limit_tree_helper(left, idx - 1);
+            let (left_right_child) = limits.read(left.right_id);
+            let (left_right_child_length) = get_limit_tree_length(left_right_child);
+            view_limit_tree_helper(left, idx - left_right_child_length - 1);
             handle_revoked_refs_alt();
         }
 

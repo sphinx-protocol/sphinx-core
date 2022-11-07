@@ -103,7 +103,9 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     Ownable.assert_only_owner();
     let (_is_eth_remote_core_set) = is_eth_remote_core_set.read();
     let (_is_eth_remote_eip_712_set) = is_eth_remote_eip_712_set.read();
-    assert _is_eth_remote_core_set + _is_eth_remote_eip_712_set = 0;
+    // with_attr error_message("[Gateway] set_addresses > Addresses have already been set") {
+    //     assert _is_eth_remote_core_set + _is_eth_remote_eip_712_set = 0;
+    // }
     l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
     l2_eth_remote_eip_712_addr.write(_l2_eth_remote_eip_712_addr);
     is_eth_remote_core_set.write(1);
@@ -179,7 +181,9 @@ func remote_create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_create_bid > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     create_bid_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
@@ -190,7 +194,9 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
     let (success) = Markets.create_bid(user, market_id, price, amount, post_only);
-    assert success = 1;
+    with_attr error_message("[Gateway] create_bid_helper > Create bid unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -223,7 +229,9 @@ func remote_create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_create_ask > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     create_ask_helper(user, base_asset, quote_asset, price, amount, post_only);
     return ();
 }
@@ -234,7 +242,9 @@ func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
     let (success) = Markets.create_ask(user, market_id, price, amount, post_only);
-    assert success = 1;
+    with_attr error_message("[Gateway] create_ask_helper > Create ask unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -262,7 +272,9 @@ func remote_market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_market_buy > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     market_buy_helper(user, base_asset, quote_asset, amount);
     return ();
 }
@@ -273,7 +285,9 @@ func market_buy_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
     let (success) = Markets.buy(user, market_id, MAX_FELT, amount);
-    assert success = 1;
+    with_attr error_message("[Gateway] market_buy_helper > Market buy unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -301,7 +315,9 @@ func remote_market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_market_sell > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     market_sell_helper(user, base_asset, quote_asset, amount);
     return ();
 }
@@ -312,7 +328,9 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
     let (success) = Markets.sell(user, market_id, 0, amount);
-    assert success = 1;
+    with_attr error_message("[Gateway] market_sell_helper > Market sell unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -322,7 +340,9 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
     let (caller) = get_caller_address();
     let (success) = Markets.delete(caller, order_id);
-    assert success = 1;
+    with_attr error_message("[Gateway] cancel_order > Cancel order unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -335,9 +355,13 @@ func remote_cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_cancel_order > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     let (success) = Markets.delete(user, order_id);
-    assert success = 1;
+    with_attr error_message("[Gateway] remote_cancel_order > Remote cancel order unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -350,11 +374,15 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (a
     let (user_wallet_balance_u256) = IERC20.balanceOf(asset, caller);
     let (amount_u256) = MathUtils.felt_to_uint256(amount);
     let (is_sufficient) = uint256_le(amount_u256, user_wallet_balance_u256); 
-    assert is_sufficient = 1;
-
+    with_attr error_message("[Gateway] deposit > Deposit unsuccessful, depositing {amount_u256} but only {user_wallet_balance_u256} available") {
+        assert is_sufficient = 1;
+    }
+    
     let (contract_address) = get_contract_address();
     let (success) = IERC20.transferFrom(asset, caller, contract_address, amount_u256);
-    assert success = 1;
+    with_attr error_message("[Gateway] deposit > Transfer from {caller} to {contract_address} unsuccessful") {
+        assert success = 1;
+    }
 
     deposit_helper(caller, asset, amount);
     return ();
@@ -371,7 +399,9 @@ func remote_deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
-    assert caller = _l2_eth_remote_core_addr;
+    with_attr error_message("[Gateway] remote_deposit > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_core_addr;
+    }
     deposit_helper(user, asset, amount);
     return ();
 }
@@ -396,7 +426,9 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     let (contract_address) = get_contract_address();
     let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
     let (success) = IERC20.transferFrom(asset, contract_address, caller, amount_u256);
-    assert success = 1;
+    with_attr error_message("[Gateway] withdraw > Transfer from {contract_address} to {caller} unsuccessful") {
+        assert success = 1;
+    }
     return ();
 }
 
@@ -413,14 +445,16 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     alloc_locals;
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
-    assert caller = _l2_eth_remote_eip_712_addr;
+    with_attr error_message("[Gateway] remote_withdraw > Caller must be L2EthRemoteEIP712, got caller {caller}") {
+        assert caller = _l2_eth_remote_eip_712_addr;
+    }
     let (_l2_eth_remote_core_addr) = l2_eth_remote_core_addr.read();
     if (chain_id == ETH_GOERLI_CHAIN_ID) {
         withdraw_helper(user, asset, amount);
         IL2EthRemoteCoreContract.remote_withdraw(_l2_eth_remote_core_addr, user, chain_id, asset, amount);
         handle_revoked_refs();
     } else {
-        with_attr error_message("Chain ID not valid") {
+        with_attr error_message("[Gateway] remote_withdraw > Chain ID not valid") {
             assert 1 = 0;
         }
         handle_revoked_refs();
@@ -434,7 +468,10 @@ func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) {
     let (user_dex_balance) = Balances.get_balance(user, asset, 1);
     let is_sufficient = is_le(amount, user_dex_balance); 
-    assert is_sufficient = 1;
+    
+    with_attr error_message("[Gateway] withdraw_helper > Withdrawal unsuccessful, requesting {amount} but only {user_dex_balance} available") {
+        assert is_sufficient = 1;
+    }
     Balances.set_balance(user, asset, 1, user_dex_balance - amount);
     return ();
 }
