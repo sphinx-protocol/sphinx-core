@@ -462,7 +462,7 @@ func remote_withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return ();
 }
 
-// Helper function to trigger withdrawal
+// Helper function to trigger withdrawal.
 func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
     user : felt, asset : felt, amount : felt
 ) {
@@ -476,7 +476,7 @@ func withdraw_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     return ();
 }
 
-// Getter for user balances
+// Getter for user balances.
 // @param user : felt representation of user's EOA
 // @param asset : felt representation of ERC20 token contract address
 // @param in_account : 1 for account balances, 0 for order balances
@@ -488,4 +488,18 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
     alloc_locals;
     let (amount) = Balances.get_balance(user, asset, in_account);
     return (amount=amount);
+}
+
+// Fetches quote for market order based on current order book.
+// @param base_asset : felt representation of ERC20 base asset contract address
+// @param quote_asset : felt representation of ERC20 quote asset contract address
+// @param is_buy : 1 for market buy order, 0 for market sell order
+// @param amount : size of order in terms of quote asset
+// @return price : quote price
+@view
+func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt
+) -> (price : felt) {
+    let (price) = Markets.fetch_quote(base_asset, quote_asset, is_buy, amount);
+    return (price=price);
 }

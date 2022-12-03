@@ -587,4 +587,77 @@ namespace Markets {
         log_delete_order.emit(order.id, limit.id, market.id, dt, order.owner, market.base_asset, market.quote_asset, order.price, order.amount, order.filled);
         return (success=1);
     }
+
+    // Fetches quote for fulfilling market order based on current order book.
+    // @param base_asset : felt representation of ERC20 base asset contract address
+    // @param quote_asset : felt representation of ERC20 quote asset contract address
+    // @param is_buy : 1 for market buy order, 0 for market sell order
+    // @param amount : size of order in terms of quote asset
+    // @return price : quote price
+    @view
+    func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt
+    ) -> (price : felt) {
+        alloc_locals;
+
+        let (market_id) = get_market_ids(base_asset, quote_asset);
+        let (market) = get_market(market_id);
+
+        if (is_buy == 1) {
+            let (prices, amounts, length) = Limits.view_limit_tree(market.ask_tree_id);
+            let (price) = fetch_quote_helper(length, prices, amounts, 0, 0, amount);
+            return (price=price);
+        } else {
+            let (prices, amounts, length) = Limits.view_limit_tree(market.bid_tree_id);
+            let (price) = fetch_quote_helper(length, prices, amounts, 0, 0, amount);
+            return (price=price);
+        }
+    }
+
+    // Helper function for fetching quote.
+    // @param idx : index denoting current iteration of function
+    // @param prices : array of order prices
+    // @param amounts : array of order amounts
+    // @param total_quote : cumulative amount filled in terms of quote asset
+    // @param total_base : cumulative amount filled in terms of base asset
+    // @param amount_rem : remaining unfilled order in terms of quote asset
+    // @return price : quote price
+    func fetch_quote_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        idx : felt, prices : felt*, amounts : felt*, total_quote : felt, total_base : felt, amount_rem : felt
+    ) -> (price : felt) {
+        alloc_locals;
+
+        %{ print("idx: {}, amount_rem: {}".format(ids.idx, ids.amount_rem)) %}
+
+        if ((idx - 0) * (amount_rem - 0) == 0) {
+            if ((total_quote - 0) * (total_base - 0) == 0) {
+                handle_revoked_refs();
+                return (price=0);
+            } else {
+                handle_revoked_refs();
+                %{ print("total_quote: {}, total_base: {}".format(ids.total_quote, ids.total_base)) %}
+                let (price, _) = unsigned_div_rem(total_base * 1000000000000000000, total_quote);
+                return (price=price);
+            }
+        } else {
+            handle_revoked_refs();
+        }
+
+        let price = prices[idx - 1];
+        let amount = amounts[idx - 1];
+        %{ print("price: {}, amount: {}".format(ids.price, ids.amount)) %}
+        let is_partial_order = is_le(amount_rem, amount - 1);
+
+        if (is_partial_order == 1) {
+            handle_revoked_refs();
+            let (new_base, _) = unsigned_div_rem(price * amount_rem, 1000000000000000000);
+            %{ print("is_partial_order: {}, new_base: {}".format(ids.is_partial_order, ids.new_base)) %}
+            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount_rem, total_base + new_base, 0);
+        } else {
+            handle_revoked_refs();
+            let (new_base, _) = unsigned_div_rem(price * amount, 1000000000000000000);
+            %{ print("is_partial_order: {}, new_base: {}".format(ids.is_partial_order, ids.new_base)) %}
+            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount, total_base + new_base, amount_rem - amount);
+        }
+    }
 }

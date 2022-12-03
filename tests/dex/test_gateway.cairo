@@ -61,6 +61,9 @@ namespace IGatewayContract {
     // View bid or ask order book for a particular market
     func view_order_book(base_asset : felt, quote_asset : felt, is_bid : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
     }
+    // Fetches quote for market order based on current order book.
+    func fetch_quote(base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt) -> (price : felt) {
+    }
 }
 
 @contract_interface
@@ -138,18 +141,18 @@ func test_gateway{
     %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1610 * 1000000000000000000, 400 * 1000000000000000, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 300 * 1000000000000000, 0);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1600 * 1000000000000000000, 300 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1800 * 1000000000000000000, 400 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1750 * 1000000000000000000, 300 * 1000000000000000, 0);
+    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1700 * 1000000000000000000, 300 * 1000000000000000, 0);
     %{ stop_prank_callable() %}
 
-     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 1);
-    %{ stop_prank_callable() %}
+    // %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
+    // IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 1);
+    // %{ stop_prank_callable() %}
 
-    %{ stop_prank_callable = start_prank(ids.l2_eth_remote_eip_712_addr, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.remote_create_bid(gateway_addr, buyer, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 0);
-    %{ stop_prank_callable() %}
+    // %{ stop_prank_callable = start_prank(ids.l2_eth_remote_eip_712_addr, target_contract_address=ids.gateway_addr) %}
+    // IGatewayContract.remote_create_bid(gateway_addr, buyer, base_asset, quote_asset, 400 * 1000000000000000000, 2000 * 1000000000000000, 0);
+    // %{ stop_prank_callable() %}
 
     let (buyer_base_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 1);
     let (buyer_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 0);
@@ -177,6 +180,9 @@ func test_gateway{
     print_list(aob_prices, aob_prices_len);
     %{ print("Amounts:") %}
     print_list(aob_amounts, aob_amounts_len);
+
+    let (price) = IGatewayContract.fetch_quote(gateway_addr, base_asset, quote_asset, 1, 1500 * 1000000000000000);
+    %{ print("price: {}".format(ids.price)) %}
 
     return ();
 }
