@@ -11,7 +11,7 @@ from src.dex.limits import Limits
 from src.dex.balances import Balances
 from src.dex.markets import Markets
 from src.dex.structs import Market
-from src.dex.events import log_create_bid
+from src.dex.events import log_create_bid, log_delete_order
 from src.utils.handle_revoked_refs import handle_revoked_refs
 from lib.math_utils import MathUtils
 from lib.openzeppelin.access.ownable.library import Ownable
@@ -20,7 +20,7 @@ from lib.openzeppelin.access.ownable.library import Ownable
 // Constants
 //
 
-const MAX_FELT = 7237005577332262320683916064616567226037794236132864326206141556383157321729; // 2^252 + 17 x 2^192 + 1
+const MAX_FELT = 340282366920938463463374607431768211456;
 const ETH_GOERLI_CHAIN_ID = 1;
 const STARKNET_GOERLI_CHAIN_ID = 2;
 
@@ -339,9 +339,13 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 @external
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
     let (caller) = get_caller_address();
-    let (success) = Markets.delete(caller, order_id);
-    with_attr error_message("[Gateway] cancel_order > Cancel order unsuccessful") {
-        assert success = 1;
+    let (order) = Orders.get_order(order_id);
+    if (caller == order.owner) {
+        let (order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(caller, order_id);
+        log_delete_order.emit(order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled);
+        handle_revoked_refs();
+    } else {
+        handle_revoked_refs();
     }
     return ();
 }
@@ -358,10 +362,8 @@ func remote_cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     with_attr error_message("[Gateway] remote_cancel_order > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    let (success) = Markets.delete(user, order_id);
-    with_attr error_message("[Gateway] remote_cancel_order > Remote cancel order unsuccessful") {
-        assert success = 1;
-    }
+    let (order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(user, order_id);
+    log_delete_order.emit(order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled);
     return ();
 }
 
@@ -496,10 +498,12 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param is_buy : 1 for market buy order, 0 for market sell order
 // @param amount : size of order in terms of quote asset
 // @return price : quote price
+// @return base_amount : order amount in terms of base asset
+// @return quote_amount : order amount in terms of quote asset
 @view
 func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt
-) -> (price : felt) {
-    let (price) = Markets.fetch_quote(base_asset, quote_asset, is_buy, amount);
-    return (price=price);
+) -> (price : felt, base_amount : felt, quote_amount : felt) {
+    let (price, base_amount, quote_amount) = Markets.fetch_quote(base_asset, quote_asset, is_buy, amount);
+    return (price=price, base_amount=base_amount, quote_amount=quote_amount);
 }
