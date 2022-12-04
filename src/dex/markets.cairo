@@ -364,9 +364,9 @@ namespace Markets {
         let (_, base_amount, quote_amount) = fetch_quote(market.base_asset, market.quote_asset, 1, amount);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         let is_sufficient = is_le(base_amount, account_balance);
-        %{ print("caller: {}, base_amount: {}, account_balance: {}".format(ids.caller, ids.base_amount, ids.account_balance)) %}
+        // %{ print("caller: {}, base_amount: {}, account_balance: {}".format(ids.caller, ids.base_amount, ids.account_balance)) %}
         let is_positive = is_le(1, quote_amount);
-        %{ print("is_sufficient: {}, is_positive: {}, market.id: {}".format(ids.is_sufficient, ids.is_positive, ids.market.id)) %}
+        // %{ print("is_sufficient: {}, is_positive: {}, market.id: {}".format(ids.is_sufficient, ids.is_positive, ids.market.id)) %}
         if (is_sufficient * is_positive * market.id == 0) {
             handle_revoked_refs();
             return (success=0);
@@ -375,10 +375,10 @@ namespace Markets {
         }
 
         let lowest_ask_exists = is_le(1, market.lowest_ask);
-        %{ print("lowest_ask_exists: {}".format(ids.lowest_ask_exists)) %}
+        // %{ print("lowest_ask_exists: {}".format(ids.lowest_ask_exists)) %}
         if (lowest_ask_exists == 0) {
             let (create_bid_success) = create_bid(caller, market_id, max_price, quote_amount, 0);
-            %{ print("create_bid_success: {}".format(ids.create_bid_success)) %}
+            // %{ print("create_bid_success: {}".format(ids.create_bid_success)) %}
             with_attr error_message("[Markets] buy > Create bid unsuccessful") {
                 assert create_bid_success = 1;
             }
@@ -389,10 +389,10 @@ namespace Markets {
         }
 
         let is_below_max_price = is_le(lowest_ask.price, max_price);
-        %{ print("is_below_max_price: {}".format(ids.is_below_max_price)) %}
+        // %{ print("is_below_max_price: {}".format(ids.is_below_max_price)) %}
         if (is_below_max_price == 0) {
             let (create_bid_success) = create_bid(caller, market_id, max_price, quote_amount, 0);
-            %{ print("create_bid_success: {}".format(ids.create_bid_success)) %}
+            // %{ print("create_bid_success: {}".format(ids.create_bid_success)) %}
             with_attr error_message("[Markets] buy > Create bid unsuccessful") {
                 assert create_bid_success = 1;
             }
@@ -405,24 +405,24 @@ namespace Markets {
         let (dt) = get_block_timestamp();
         let is_partial_fill = is_le(quote_amount, lowest_ask.amount - lowest_ask.filled - 1);
         let (limit) = Limits.get_limit(lowest_ask.limit_id);
-        %{ print("is_partial_fill: {}".format(ids.is_partial_fill)) %}
+        // %{ print("is_partial_fill: {}".format(ids.is_partial_fill)) %}
         if (is_partial_fill == 1) {
             // Partial fill of order
             Orders.set_filled(lowest_ask.id, quote_amount);
             let (transfer_balance_success_1) = Balances.transfer_from_order(lowest_ask.owner, market.quote_asset, quote_amount);
             let (updated_base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask.price, 1000000000000000000);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
-            %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
+            // %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
             with_attr error_message("[Markets] buy > Transfer balance 1 unsuccessful") {
                 assert transfer_balance_success_1 = 1;
             }
             let (transfer_balance_success_2) = Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, quote_amount);
-            %{ print("transfer_balance_success_2: {}".format(ids.transfer_balance_success_2)) %}
+            // %{ print("transfer_balance_success_2: {}".format(ids.transfer_balance_success_2)) %}
             with_attr error_message("[Markets] buy > Transfer balance 2 unsuccessful") {
                 assert transfer_balance_success_2 = 1;
             }
             let (update_limit_success) = Limits.update(limit.id, limit.total_vol - quote_amount, limit.length, limit.head_id, limit.tail_id);                
-            %{ print("update_limit_success: {}".format(ids.update_limit_success)) %}
+            // %{ print("update_limit_success: {}".format(ids.update_limit_success)) %}
             with_attr error_message("[Markets] buy > Update limit unsuccessful") {
                 assert update_limit_success = 1;
             }
@@ -436,12 +436,12 @@ namespace Markets {
             delete(caller, lowest_ask.id);
             let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, 1000000000000000000);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
-            %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
+            // %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
             with_attr error_message("[Markets] buy > Transfer balance 1 unsuccessful") {
                 assert transfer_balance_success_1 = 1;
             }
             let (transfer_balance_success_2) = Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, quote_amount);
-            %{ print("transfer_balance_success_2: {}".format(ids.transfer_balance_success_2)) %}
+            // %{ print("transfer_balance_success_2: {}".format(ids.transfer_balance_success_2)) %}
             with_attr error_message("[Markets] buy > Transfer balance 2 unsuccessful") {
                 assert transfer_balance_success_2 = 1;
             }
@@ -566,30 +566,30 @@ namespace Markets {
 
         let (order) = Orders.get_order(order_id);
         let (update_orders_success) = Orders.remove(order_id);
-        %{ print("update_orders_success: {}".format(ids.update_orders_success)) %}
+        // %{ print("update_orders_success: {}".format(ids.update_orders_success)) %}
         with_attr error_message("[Markets] delete > Update orders unsuccessful") {
             assert update_orders_success = 1;
         }
         let (new_head_id, new_tail_id) = Orders.get_head_and_tail(order.limit_id);
         let (limit) = Limits.get_limit(order.limit_id);
         let (update_limit_success) = Limits.update(limit.id, limit.total_vol - order.amount + order.filled, limit.length - 1, new_head_id, new_tail_id);
-        %{ print("update_limit_success: {}".format(ids.update_limit_success)) %}
+        // %{ print("update_limit_success: {}".format(ids.update_limit_success)) %}
         with_attr error_message("[Markets] delete > Update limits unsuccessful") {
             assert update_limit_success = 1;
         }
 
         let (market) = markets.read(limit.market_id);
 
-        %{ print("order.is_buy: {}".format(ids.order.is_buy)) %}
+        // %{ print("order.is_buy: {}".format(ids.order.is_buy)) %}
         if (order.is_buy == 1) {
-            %{ print("new_head_id: {}".format(ids.new_head_id)) %}
+            // %{ print("new_head_id: {}".format(ids.new_head_id)) %}
             if (new_head_id == 0) {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_max(limit.tree_id);
-                %{ print("next_limit.id: {}".format(ids.next_limit.id)) %}
+                // %{ print("next_limit.id: {}".format(ids.next_limit.id)) %}
                 if (next_limit.id == 0) {
                     let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, 0);
-                    %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                    // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                     with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                         assert update_market_success = 1;
                     }
@@ -597,7 +597,7 @@ namespace Markets {
                 } else {
                     let (next_head, _) = Orders.get_head_and_tail(next_limit.id);
                     let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, next_head);
-                    %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                    // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                     with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                         assert update_market_success = 1;
                     }
@@ -605,27 +605,27 @@ namespace Markets {
                 }
             } else {
                 let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, new_head_id);
-                %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                 with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                     assert update_market_success = 1;
                 }
                 handle_revoked_refs();     
             }
             let (update_balance_success) = Balances.transfer_from_order(order.owner, market.base_asset, order.amount);
-            %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
+            // %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
             with_attr error_message("[Markets] delete > Update balance unsuccessful") {
                 assert update_balance_success = 1;
             }
             handle_revoked_refs();
         } else {
-            %{ print("new_head_id: {}".format(ids.new_head_id)) %}
+            // %{ print("new_head_id: {}".format(ids.new_head_id)) %}
             if (new_head_id == 0) {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_max(limit.tree_id);
-                %{ print("next_limit.id: {}".format(ids.next_limit.id)) %}
+                // %{ print("next_limit.id: {}".format(ids.next_limit.id)) %}
                 if (next_limit.id == 0) {
                     let (update_market_success) = update_inside_quote(market.id, 0, market.highest_bid);
-                    %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                    // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                     with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                         assert update_market_success = 1;
                     }
@@ -633,7 +633,7 @@ namespace Markets {
                 } else {
                     let (next_head, _) = Orders.get_head_and_tail(next_limit.id);
                     let (update_market_success) = update_inside_quote(market.id, next_head, market.highest_bid);
-                    %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                    // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                     with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                         assert update_market_success = 1;
                     }
@@ -641,14 +641,14 @@ namespace Markets {
                 }
             } else {
                 let (update_market_success) = update_inside_quote(market.id, new_head_id, market.highest_bid);
-                %{ print("update_market_success: {}".format(ids.update_market_success)) %}
+                // %{ print("update_market_success: {}".format(ids.update_market_success)) %}
                 with_attr error_message("[Markets] delete > Update markets unsuccessful") {
                     assert update_market_success = 1;
                 }
                 handle_revoked_refs();    
             }
             let (update_balance_success) = Balances.transfer_from_order(order.owner, market.quote_asset, order.amount);
-            %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
+            // %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
             with_attr error_message("[Markets] delete > Update balance unsuccessful") {
                 assert update_balance_success = 1;
             }
@@ -709,7 +709,7 @@ namespace Markets {
             } else {
                 handle_revoked_refs();
                 let (price, _) = unsigned_div_rem(total_base * 1000000000000000000, total_quote);
-                %{ print("price: {}, base_amount: {}, quote_amount: {}".format(ids.price, ids.total_base, ids.total_quote)) %}
+                // %{ print("price: {}, base_amount: {}, quote_amount: {}".format(ids.price, ids.total_base, ids.total_quote)) %}
                 return (price=price, base_amount=total_base, quote_amount=total_quote);
             }
         } else {
