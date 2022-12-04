@@ -678,7 +678,11 @@ namespace Markets {
 
         if (is_buy == 1) {
             let (prices, amounts, length) = Limits.view_limit_tree(market.ask_tree_id);
-            let (price, base_amount, quote_amount) = fetch_quote_helper(length, prices, amounts, 0, 0, amount);
+            let (rev_prices : felt*) = alloc();
+            let (rev_amounts : felt*) = alloc();
+            reverse_array{new_array=rev_prices}(array=prices, idx=length, length=length);
+            reverse_array{new_array=rev_amounts}(array=amounts, idx=length, length=length);
+            let (price, base_amount, quote_amount) = fetch_quote_helper(length, rev_prices, rev_amounts, 0, 0, amount);
             return (price=price, base_amount=base_amount, quote_amount=quote_amount);
         } else {
             let (prices, amounts, length) = Limits.view_limit_tree(market.bid_tree_id);
@@ -729,5 +733,21 @@ namespace Markets {
             let (new_base, _) = unsigned_div_rem(price * amount, 1000000000000000000);
             return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount, total_base + new_base, amount_rem - amount);
         }
+    }
+
+    // Helper function to reverse array.
+    // @param (implict arg) new_array : pointer to new array
+    // @param array : original array
+    // @param idx : index denoting current run of function
+    // @param length : length of array
+    func reverse_array{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, new_array : felt*} (
+        array : felt*, idx : felt, length : felt
+    ) {
+        if (idx == 0) {
+            return ();
+        }
+        assert new_array[idx - 1] = array[length - idx];
+        reverse_array(array, idx - 1, length);
+        return ();
     }
 }
