@@ -9,8 +9,8 @@ from starkware.cairo.common.math import assert_not_zero, assert_le
 from starkware.cairo.common.bool import TRUE, FALSE
 from starkware.cairo.common.uint256 import Uint256, uint256_check, uint256_eq, uint256_not
 
-from openzeppelin.security.safemath.library import SafeUint256
-from openzeppelin.utils.constants.library import UINT8_MAX
+from lib.openzeppelin.security.safemath.library import SafeUint256
+from lib.openzeppelin.utils.constants.library import UINT8_MAX
 
 //
 // Events

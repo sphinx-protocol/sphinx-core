@@ -427,7 +427,7 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     withdraw_helper(caller, asset, amount);
     let (contract_address) = get_contract_address();
     let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
-    let (success) = IERC20.transferFrom(asset, contract_address, caller, amount_u256);
+    let (success) = IERC20.transfer(asset, caller, amount_u256);
     with_attr error_message("[Gateway] withdraw > Transfer from {contract_address} to {caller} unsuccessful") {
         assert success = 1;
     }
