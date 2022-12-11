@@ -1,5 +1,5 @@
-# starkx-core
+# sphinx-core
 
-This repo contains the core contracts for Stark X. 
+This repo contains the core contracts for Sphinx. 
 
-Please see [here](https://github.com/stark-dex) for a description of the project.
+Please see [here](https://github.com/sphinx-dex) for a description of the project.
