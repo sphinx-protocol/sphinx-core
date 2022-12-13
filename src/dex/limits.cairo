@@ -7,6 +7,7 @@ from starkware.starknet.common.syscalls import get_caller_address
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.default_dict import default_dict_new
 from starkware.cairo.common.dict import dict_write, dict_read
+from src.dex.orders import Orders
 from src.dex.structs import Limit
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
@@ -406,7 +407,7 @@ namespace Limits {
 
         let (left) = limits.read(root.left_id);
         let (left_length) = get_limit_tree_length(left);
-        view_limit_tree_helper{prices_ptr=prices, amounts_ptr=amounts}(node=root, idx=left_length);
+        view_limit_tree_helper{prices=prices, amounts=amounts}(node=root, idx=left_length);
 
         let (length) = get_limit_tree_length(root);
         return (prices=prices, amounts=amounts, length=length);
@@ -419,8 +420,8 @@ namespace Limits {
         syscall_ptr: felt*, 
         pedersen_ptr: HashBuiltin*, 
         range_check_ptr, 
-        prices_ptr : felt*,
-        amounts_ptr : felt*,
+        prices : felt*,
+        amounts : felt*,
     } (node : Limit, idx : felt) {
         alloc_locals;
 
@@ -444,14 +445,14 @@ namespace Limits {
             view_limit_tree_helper(right, idx + right_left_child_length + 1);
         }
 
-        assert prices_ptr[idx] = node.price;
-        assert amounts_ptr[idx] = node.total_vol;
+        assert prices[idx] = node.price;
+        assert amounts[idx] = node.total_vol;
 
         return ();
     }
 
     // Helper function to get length of limit tree
-    // @param node : node in current iteration of function (startsfrom root)
+    // @param node : node in current iteration of function (starts from root)
     // @return length : length of limit tree
     func get_limit_tree_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         node : Limit
@@ -468,20 +469,154 @@ namespace Limits {
         }
     }
 
+    // Utility function to return all orders in a limit tree, from left to right.
+    // @param tree_id : ID of tree to be viewed
+    // @return prices : array of limit prices
+    // @return amounts : array of order volumes 
+    // @return owners : array of order owners
+    // @return ids : array of order ids
+    // @return length : length of limit tree in number of orders
+    func view_limit_tree_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        tree_id : felt
+    ) -> (prices : felt*, amounts : felt*, owners: felt*, ids: felt*, length : felt) {
+        alloc_locals;
+
+        let (root_id) = roots.read(tree_id);
+        let (root) = limits.read(root_id);
+
+        let (prices : felt*) = alloc();
+        let (amounts : felt*) = alloc();
+        let (owners : felt*) = alloc();
+        let (ids : felt*) = alloc();
+
+        let (left) = limits.read(root.left_id);
+        let (left_length) = get_limit_tree_order_length(left);
+
+        view_limit_tree_orders_helper{prices=prices, amounts=amounts, owners=owners, ids=ids}(node=root, idx=left_length);
+
+        let (length) = get_limit_tree_order_length(root);
+        return (prices=prices, amounts=amounts, owners=owners, ids=ids, length=length);
+    }
+
+    // Helper function to retrieve limit tree orders
+    // @param node : node in current iteration of function (starts from root)
+    // @param idx : node index for matching prices with amounts (unsorted)
+    func view_limit_tree_orders_helper{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr, 
+        prices : felt*,
+        amounts : felt*,
+        owners : felt*,
+        ids : felt*,
+    } (node : Limit, idx : felt) {
+        alloc_locals;
+
+        if (node.left_id == 0) {
+            handle_revoked_refs_alt_2();
+        } else {
+            let (left) = limits.read(node.left_id);
+            let (left_right_child) = limits.read(left.right_id);
+            let (left_right_child_length) = get_limit_tree_order_length(left_right_child);
+            view_limit_tree_orders_helper(left, idx - left_right_child_length - left.length);
+            handle_revoked_refs_alt_2();
+        }
+
+        if (node.right_id == 0) {
+            handle_revoked_refs_alt_2();
+        } else {
+            handle_revoked_refs_alt_2();
+            let (right) = limits.read(node.right_id);
+            let (right_left_child) = limits.read(right.left_id);
+            let (right_left_child_length) = get_limit_tree_order_length(right_left_child);
+            view_limit_tree_orders_helper(right, idx + right_left_child_length + node.length);
+        }
+        
+        fill_orders_helper(node.head_id, idx);
+        
+        return ();
+    }
+
+    func fill_orders_helper{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr, 
+        prices : felt*,
+        amounts : felt*,
+        owners : felt*,
+        ids : felt*,
+    } (curr_order_id : felt, idx : felt) {
+        alloc_locals;
+        
+        let (curr) = Orders.get_order(curr_order_id);
+
+        assert prices[idx] = curr.price;
+        assert amounts[idx] = curr.amount;
+        assert owners[idx] = curr.owner;
+        assert ids[idx] = curr.id;
+
+        if (curr.next_id == 0) {
+            handle_revoked_refs_alt_2();
+        } else {
+            handle_revoked_refs_alt_2();
+            fill_orders_helper(curr.next_id, idx + 1);
+        }
+        return ();
+    }
+
+    // Helper function to get length of limit tree in number of orders
+    // @param node : node in current iteration of function (starts from root)
+    // @return length : length of limit tree in number of orders
+    func get_limit_tree_order_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        node : Limit
+    ) -> (length : felt) {
+        alloc_locals;
+        if (node.id == 0) {
+            return (length=0);
+        } else {
+            let (left) = limits.read(node.left_id);
+            let (right) = limits.read(node.right_id);
+            let (left_length) = get_limit_tree_order_length(left);
+            let (right_length) = get_limit_tree_order_length(right);
+            return (length=node.length+left_length+right_length);
+        }
+    }
+
     // Utility function to handle revoked implicit references.
-    // @dev Amended from regular version to include prices_ptr and amounts_ptr
+    // @dev Amended from regular version to include prices and amounts
     func handle_revoked_refs_alt{
         syscall_ptr: felt*, 
         pedersen_ptr: HashBuiltin*, 
         range_check_ptr,
-        prices_ptr : felt*,
-        amounts_ptr : felt*,
+        prices : felt*,
+        amounts : felt*,
     } () {
         tempvar syscall_ptr=syscall_ptr;
         tempvar pedersen_ptr=pedersen_ptr;
         tempvar range_check_ptr=range_check_ptr;
-        tempvar prices_ptr=prices_ptr;
-        tempvar amounts_ptr=amounts_ptr;
+        tempvar prices=prices;
+        tempvar amounts=amounts;
+        return ();
+    }
+
+    // Utility function to handle revoked implicit references.
+    // @dev Amended from regular version to include prices, amounts, orders and ids
+    func handle_revoked_refs_alt_2{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr,
+        prices : felt*,
+        amounts : felt*,
+        owners : felt*,
+        ids : felt*,
+    } () {
+        tempvar syscall_ptr=syscall_ptr;
+        tempvar pedersen_ptr=pedersen_ptr;
+        tempvar range_check_ptr=range_check_ptr;
+        tempvar prices=prices;
+        tempvar amounts=amounts;
+        tempvar owners=owners;
+        tempvar ids=ids;
         return ();
     }
 

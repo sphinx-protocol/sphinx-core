@@ -1,19 +1,13 @@
-["protostar.config"]
-protostar_version = "0.8.1"
+[project]
+protostar-version = "0.8.1"
+lib-path = "lib"
 
-["protostar.project"]
-libs_path = "lib"
+[contracts]
+gateway = ["src/dex/gateway.cairo"]
+l2EthRemoteCore = ["src/crosschain/l2_eth_remote_core.cairo"]
+l2EthRemoteEIP712 = ["src/crosschain/l2_eth_remote_eip_712.cairo"]
+ERC20 = ["src/ERC20/ERC20.cairo"]
 
-["protostar.contracts"]
-gateway = [
-    "src/dex/gateway.cairo",
-]
-l2EthRemoteCore = [
-    "src/crosschain/l2_eth_remote_core.cairo",
-]
-l2EthRemoteEIP712 = [
-    "src/crosschain/l2_eth_remote_eip_712.cairo",
-]
-ERC20 = [
-    "src/ERC20/ERC20.cairo",
-]
+[profile.testnet.project]
+gateway-url = "http://127.0.0.1:5050/"
+chain-id = 1536727068981429685321

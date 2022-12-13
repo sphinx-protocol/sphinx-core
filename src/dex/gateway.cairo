@@ -152,6 +152,46 @@ func view_order_book{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
     }
 }
 
+// View orders in bid or ask order book for a particular market
+// @param base_asset : felt representation of ERC20 base asset contract address
+// @param quote_asset : felt representation of ERC20 quote asset contract address
+// @param is_bid : 1 to view bid order book, 0 to view ask order book
+// @return prices : array of limit prices
+// @return amounts : array of order volumes 
+// @return owners : array of order owners
+// @return ids : array of order ids
+// @return length : length of limit tree in number of orders
+@view
+func view_order_book_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    base_asset : felt, quote_asset : felt, is_bid : felt
+) -> (
+    prices_len : felt, 
+    prices : felt*, 
+    amounts_len : felt, 
+    amounts : felt*, 
+    owners_len: felt, 
+    owners: felt*, 
+    ids_len: felt,
+    ids: felt*
+) {
+    alloc_locals;
+
+    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
+    let (market) = Markets.get_market(market_id);
+
+    if (is_bid == 1) {
+        let (prices, amounts, owners, ids, length) = Limits.view_limit_tree_orders(market.bid_tree_id);
+        return (
+            prices_len=length, prices=prices, amounts_len=length, amounts=amounts, owners_len=length, owners=owners, ids_len=length, ids=ids
+        );
+    } else {
+        let (prices, amounts, owners, ids, length) = Limits.view_limit_tree_orders(market.ask_tree_id);
+        return (
+            prices_len=length, prices=prices, amounts_len=length, amounts=amounts, owners_len=length, owners=owners, ids_len=length, ids=ids
+        );
+    }
+}
+
 // Submit a new bid (limit buy order) to a given market.
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
