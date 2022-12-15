@@ -14,8 +14,9 @@ func test_orders{
     alloc_locals;
 
     const owner = 456456456;
-    const user = 456456456;
+    const user = 123123123;
     const markets_addr = 7878787878;
+    const storage_addr = 3453453453;
 
     Orders.push(is_buy=1, price=25, amount=1000, dt=1666091715, owner=user, limit_id=1);
     Orders.push(is_buy=0, price=24, amount=500, dt=1666091888, owner=user, limit_id=2);

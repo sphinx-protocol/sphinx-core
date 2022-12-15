@@ -70,6 +70,13 @@ namespace IGatewayContract {
 }
 
 @contract_interface
+namespace IStorageContract {
+    // Set gateway contract address
+    func set_gateway_address(_l2_gateway_contract_address : felt) {
+    }
+}
+
+@contract_interface
 namespace IERC20 {
     // Approve spender
     func approve(spender: felt, amount: Uint256) -> (success: felt) {
@@ -108,11 +115,18 @@ func test_gateway{
     local base_asset : felt;
     local quote_asset : felt;
     local gateway_addr : felt;
+    local storage_addr : felt;
     %{ ids.l2_eth_remote_core_addr = deploy_contract("./src/crosschain/l2_eth_remote_core.cairo", [ids.owner]).contract_address %}
     %{ ids.l2_eth_remote_eip_712_addr = deploy_contract("./src/crosschain/l2_eth_remote_eip_712.cairo", [ids.owner]).contract_address %}
     %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, 1, 1000000 * 1000000000000000000, 0, ids.buyer]).contract_address %}
     %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, 2, 1000000 * 1000000000000000000, 0, ids.seller]).contract_address %}
-    %{ ids.gateway_addr = deploy_contract("./src/dex/gateway.cairo", [ids.owner]).contract_address %}
+    %{ ids.storage_addr = deploy_contract("./src/dex/storage.cairo", [ids.owner]).contract_address %}
+    %{ ids.gateway_addr = deploy_contract("./src/dex/gateway.cairo", [ids.owner, ids.storage_addr]).contract_address %}
+
+    // Set gateway contract address in IStorageContract
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.storage_addr) %}
+    IStorageContract.set_gateway_address(storage_addr, gateway_addr);
+    %{ stop_prank_callable() %}
 
     // Set contract addresses and create new market
     %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.gateway_addr) %}

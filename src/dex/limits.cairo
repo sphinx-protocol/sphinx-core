@@ -11,21 +11,35 @@ from src.dex.orders import Orders
 from src.dex.structs import Limit
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
+@contract_interface
+namespace IStorageContract {
+    // Get limit by limit ID
+    func get_limit(limit_id : felt) -> (limit : Limit) {
+    }
+    // Set limit by limit ID
+    func set_limit(limit_id : felt, new_limit : Limit) {
+    }
+    // Get root node by tree ID
+    func get_root(tree_id : felt) -> (id : felt) {
+    }
+    // Set root node by tree ID
+    func set_root(tree_id : felt, new_id : felt) {
+    }
+    // Get latest limit id
+    func get_curr_limit_id() -> (id : felt) {
+    }
+    // Set latest limit id
+    func set_curr_limit_id(new_id : felt) {
+    }
+}
+
 //
 // Storage vars
 //
 
-// Stores details of limit prices as mapping.
+// Stores orders in doubly linked lists.
 @storage_var
-func limits(id : felt) -> (limit : Limit) {
-}
-// Stores roots of binary search trees.
-@storage_var
-func roots(tree_id : felt) -> (id : felt) {
-}
-// Stores latest limit id.
-@storage_var
-func curr_limit_id() -> (id : felt) {
+func l2_storage_contract_address() -> (addr : felt) {
 }
 
 namespace Limits {
@@ -36,14 +50,17 @@ namespace Limits {
 
     // Initialiser function
     // @dev Called by GatewayContract on deployment
-    func initialise{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-        curr_limit_id.write(1);
+    func initialise{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        _l2_storage_contract_address
+    ) {
+        l2_storage_contract_address.write(_l2_storage_contract_address);
         return ();
     }
 
     // Getter for limit price
     func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (limit : Limit) {
-        let (limit) = limits.read(limit_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
         return (limit=limit);
     }
 
@@ -53,11 +70,12 @@ namespace Limits {
     func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (min : Limit) {
         alloc_locals;
         let empty_limit : Limit* = gen_empty_limit();
-        let (root_id) = roots.read(tree_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         if (root_id == 0) {
             return (min=[empty_limit]);
         }
-        let (root) = limits.read(root_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
         let (min, _) = find_min(root, [empty_limit]);
         return (min=min);
     }
@@ -67,12 +85,13 @@ namespace Limits {
     // @return max : node representation of highest limit price in the tree
     func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (max : Limit) {
         alloc_locals;
-        let (root_id) = roots.read(tree_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         let empty_limit: Limit* = gen_empty_limit();
         if (root_id == 0) {
             return (max=[empty_limit]);
         }
-        let (root) = limits.read(root_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
         let (max) = find_max(curr=root);
         return (max=max);
     }
@@ -87,28 +106,29 @@ namespace Limits {
     ) -> (new_limit : Limit) {
         alloc_locals;
         
-        let (id) = curr_limit_id.read();
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (id) = IStorageContract.get_curr_limit_id(storage_addr);
         tempvar new_limit: Limit* = new Limit(
             id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=tree_id, market_id=market_id
         );
-        limits.write(id, [new_limit]);
-        curr_limit_id.write(id + 1);
+        IStorageContract.set_limit(storage_addr, id, [new_limit]);
+        IStorageContract.set_curr_limit_id(storage_addr, id + 1);
         
-        let (root_id) = roots.read(tree_id);
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         if (root_id == 0) {
-            roots.write(tree_id, new_limit.id);
+            IStorageContract.set_root(storage_addr, tree_id, new_limit.id);
 
             // Diagnostics
-            // let (new_root) = limits.read(new_limit.id);
+            // let (new_root) = IStorageContract.get_limit(storage_addr, new_limit.id);
             // print_limit_tree(new_root, 1);
 
             return (new_limit=[new_limit]);
         }
-        let (root) = limits.read(root_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
         let (inserted) = insert_helper(price, root, new_limit.id, tree_id, market_id);
 
         // Diagnostics
-        // let (new_root) = limits.read(root_id);
+        // let (new_root) = IStorageContract.get_limit(storage_addr, root_id);
         // print_limit_tree(inserted, 1);
 
         return (new_limit=inserted);
@@ -125,8 +145,9 @@ namespace Limits {
         price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt
     ) -> (new_limit : Limit) {
         alloc_locals;
-        let (root_id) = roots.read(tree_id);
-        let (root) = limits.read(root_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
 
         let greater_than = is_le(curr.price, price - 1);
         let less_than = is_le(price, curr.price - 1);
@@ -137,12 +158,12 @@ namespace Limits {
                     id=curr.id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
                     length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
                 );
-                limits.write(curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
                 handle_revoked_refs();
-                let (new_limit) = limits.read(new_limit_id);
+                let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
             } else {
-                let (curr_right) = limits.read(curr.right_id);
+                let (curr_right) = IStorageContract.get_limit(storage_addr, curr.right_id);
                 handle_revoked_refs();
                 return insert_helper(price, curr_right, new_limit_id, tree_id, market_id);
             }
@@ -156,12 +177,12 @@ namespace Limits {
                     id=curr.id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
                     length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
                 );
-                limits.write(curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
                 handle_revoked_refs();
-                let (new_limit) = limits.read(new_limit_id);
+                let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
             } else {
-                let (curr_left) = limits.read(curr.left_id);
+                let (curr_left) = IStorageContract.get_limit(storage_addr, curr.left_id);
                 handle_revoked_refs();
                 return insert_helper(price, curr_left, new_limit_id, tree_id, market_id);
             }
@@ -182,12 +203,13 @@ namespace Limits {
         price : felt, tree_id : felt
     ) -> (limit : Limit, parent : Limit) {
         alloc_locals;
-        let (root_id) = roots.read(tree_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         let empty_limit: Limit* = gen_empty_limit();
         if (root_id == 0) {
             return (limit=[empty_limit], parent=[empty_limit]);
         }
-        let (root) = limits.read(root_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
         return find_helper(tree_id=tree_id, price=price, curr=root, parent=[empty_limit]);
     }
 
@@ -203,6 +225,7 @@ namespace Limits {
     ) -> (limit : Limit, parent : Limit) {
         alloc_locals;
 
+        let (storage_addr) = l2_storage_contract_address.read();
         if (curr.id == 0) {
             let empty_limit: Limit* = gen_empty_limit();
             handle_revoked_refs();
@@ -213,7 +236,7 @@ namespace Limits {
 
         let greater_than = is_le(curr.price, price - 1);
         if (greater_than == 1) {
-            let (curr_right) = limits.read(curr.right_id);
+            let (curr_right) = IStorageContract.get_limit(storage_addr, curr.right_id);
             handle_revoked_refs();
             return find_helper(tree_id, price, curr_right, curr);
         } else {
@@ -222,7 +245,7 @@ namespace Limits {
 
         let less_than = is_le(price, curr.price - 1);
         if (less_than == 1) {
-            let (curr_left) = limits.read(curr.left_id);
+            let (curr_left) = IStorageContract.get_limit(storage_addr, curr.left_id);
             handle_revoked_refs();
             return find_helper(tree_id, price, curr_left, curr);
         } else {
@@ -243,7 +266,8 @@ namespace Limits {
         alloc_locals;
 
         let empty_limit: Limit* = gen_empty_limit();
-        let (root_id) = roots.read(tree_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         if (root_id == 0) {
             handle_revoked_refs();
             return (del=[empty_limit]);
@@ -269,7 +293,7 @@ namespace Limits {
                 update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=limit.left_id);
                 handle_revoked_refs();
             } else {
-                let (right) = limits.read(limit.right_id);
+                let (right) = IStorageContract.get_limit(storage_addr, limit.right_id);
                 let (successor, successor_parent) = find_min(right, limit);
 
                 update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=successor.id);
@@ -287,8 +311,8 @@ namespace Limits {
         }
 
         // Diagnostics
-        // let (root_id) = roots.read(tree_id);
-        // let (new_root) = limits.read(root_id);
+        // let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        // let (new_root) = IStorageContract.get_limit(storage_addr, root_id);
         // print_limit_tree(new_root, 1);
 
         return (del=limit);
@@ -304,8 +328,9 @@ namespace Limits {
     ) {
         alloc_locals;
 
+        let (storage_addr) = l2_storage_contract_address.read();
         if (parent.id == 0) {
-            roots.write(tree_id, new_id);
+            IStorageContract.set_root(storage_addr, tree_id, new_id);
             handle_revoked_refs();
         } else {
             handle_revoked_refs();
@@ -331,7 +356,8 @@ namespace Limits {
             id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
             length=node.length, head_id=node.head_id, tail_id=node.tail_id, tree_id=node.tree_id, market_id=node.market_id
         );
-        limits.write(node.id, [new_node]);
+        let (storage_addr) = l2_storage_contract_address.read();
+        IStorageContract.set_limit(storage_addr, node.id, [new_node]);
         handle_revoked_refs();
         return ();
     }
@@ -347,7 +373,8 @@ namespace Limits {
         if (curr.left_id == 0) {
             return (min=curr, parent=parent);
         }
-        let (left) = limits.read(curr.left_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (left) = IStorageContract.get_limit(storage_addr, curr.left_id);
         return find_min(curr=left, parent=curr);
     }
 
@@ -358,7 +385,8 @@ namespace Limits {
         if (curr.right_id == 0) {
             return (max=curr);
         }
-        let (right) = limits.read(curr.right_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (right) = IStorageContract.get_limit(storage_addr, curr.right_id);
         return find_max(curr=right);
     }
 
@@ -372,12 +400,13 @@ namespace Limits {
         if (limit_id == 0) {
             return (success=0);
         }
-        let (limit) = limits.read(limit_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
         tempvar new_limit: Limit* = new Limit(
             id=limit.id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
             length=length, head_id=head_id, tail_id=tail_id, tree_id=limit.tree_id, market_id=limit.market_id
         );
-        limits.write(limit_id, [new_limit]);
+        IStorageContract.set_limit(storage_addr, limit_id, [new_limit]);
         return (success=1);
     }
 
@@ -399,13 +428,14 @@ namespace Limits {
     ) -> (prices : felt*, amounts : felt*, length : felt) {
         alloc_locals;
 
-        let (root_id) = roots.read(tree_id);
-        let (root) = limits.read(root_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
 
         let (prices : felt*) = alloc();
         let (amounts : felt*) = alloc();
 
-        let (left) = limits.read(root.left_id);
+        let (left) = IStorageContract.get_limit(storage_addr, root.left_id);
         let (left_length) = get_limit_tree_length(left);
         view_limit_tree_helper{prices=prices, amounts=amounts}(node=root, idx=left_length);
 
@@ -425,11 +455,12 @@ namespace Limits {
     } (node : Limit, idx : felt) {
         alloc_locals;
 
+        let (storage_addr) = l2_storage_contract_address.read();
         if (node.left_id == 0) {
             handle_revoked_refs_alt();
         } else {
-            let (left) = limits.read(node.left_id);
-            let (left_right_child) = limits.read(left.right_id);
+            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
+            let (left_right_child) = IStorageContract.get_limit(storage_addr, left.right_id);
             let (left_right_child_length) = get_limit_tree_length(left_right_child);
             view_limit_tree_helper(left, idx - left_right_child_length - 1);
             handle_revoked_refs_alt();
@@ -439,8 +470,8 @@ namespace Limits {
             handle_revoked_refs_alt();
         } else {
             handle_revoked_refs_alt();
-            let (right) = limits.read(node.right_id);
-            let (right_left_child) = limits.read(right.left_id);
+            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
+            let (right_left_child) = IStorageContract.get_limit(storage_addr, right.left_id);
             let (right_left_child_length) = get_limit_tree_length(right_left_child);
             view_limit_tree_helper(right, idx + right_left_child_length + 1);
         }
@@ -458,11 +489,12 @@ namespace Limits {
         node : Limit
     ) -> (length : felt) {
         alloc_locals;
+        let (storage_addr) = l2_storage_contract_address.read();
         if (node.id == 0) {
             return (length=0);
         } else {
-            let (left) = limits.read(node.left_id);
-            let (right) = limits.read(node.right_id);
+            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
+            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
             let (left_length) = get_limit_tree_length(left);
             let (right_length) = get_limit_tree_length(right);
             return (length=1+left_length+right_length);
@@ -481,15 +513,16 @@ namespace Limits {
     ) -> (prices : felt*, amounts : felt*, owners: felt*, ids: felt*, length : felt) {
         alloc_locals;
 
-        let (root_id) = roots.read(tree_id);
-        let (root) = limits.read(root_id);
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
 
         let (prices : felt*) = alloc();
         let (amounts : felt*) = alloc();
         let (owners : felt*) = alloc();
         let (ids : felt*) = alloc();
 
-        let (left) = limits.read(root.left_id);
+        let (left) = IStorageContract.get_limit(storage_addr, root.left_id);
         let (left_length) = get_limit_tree_order_length(left);
 
         view_limit_tree_orders_helper{prices=prices, amounts=amounts, owners=owners, ids=ids}(node=root, idx=left_length);
@@ -512,11 +545,12 @@ namespace Limits {
     } (node : Limit, idx : felt) {
         alloc_locals;
 
+        let (storage_addr) = l2_storage_contract_address.read();
         if (node.left_id == 0) {
             handle_revoked_refs_alt_2();
         } else {
-            let (left) = limits.read(node.left_id);
-            let (left_right_child) = limits.read(left.right_id);
+            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
+            let (left_right_child) = IStorageContract.get_limit(storage_addr, left.right_id);
             let (left_right_child_length) = get_limit_tree_order_length(left_right_child);
             view_limit_tree_orders_helper(left, idx - left_right_child_length - left.length);
             handle_revoked_refs_alt_2();
@@ -526,8 +560,8 @@ namespace Limits {
             handle_revoked_refs_alt_2();
         } else {
             handle_revoked_refs_alt_2();
-            let (right) = limits.read(node.right_id);
-            let (right_left_child) = limits.read(right.left_id);
+            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
+            let (right_left_child) = IStorageContract.get_limit(storage_addr, right.left_id);
             let (right_left_child_length) = get_limit_tree_order_length(right_left_child);
             view_limit_tree_orders_helper(right, idx + right_left_child_length + node.length);
         }
@@ -548,6 +582,7 @@ namespace Limits {
     } (curr_order_id : felt, idx : felt) {
         alloc_locals;
         
+        let (storage_addr) = l2_storage_contract_address.read();
         let (curr) = Orders.get_order(curr_order_id);
 
         assert prices[idx] = curr.price;
@@ -571,11 +606,12 @@ namespace Limits {
         node : Limit
     ) -> (length : felt) {
         alloc_locals;
+        let (storage_addr) = l2_storage_contract_address.read();
         if (node.id == 0) {
             return (length=0);
         } else {
-            let (left) = limits.read(node.left_id);
-            let (right) = limits.read(node.right_id);
+            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
+            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
             let (left_length) = get_limit_tree_order_length(left);
             let (right_length) = get_limit_tree_order_length(right);
             return (length=node.length+left_length+right_length);

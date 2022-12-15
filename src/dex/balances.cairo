@@ -6,17 +6,29 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
+@contract_interface
+namespace IStorageContract {
+    // Get account balance for user
+    func get_account_balance(user : felt, asset : felt) -> (amount : felt) {
+    }
+    // Set account balance for user
+    func set_account_balance(user : felt, asset : felt, new_amount : felt) {
+    }
+    // Get order balance for user
+    func get_order_balance(user : felt, asset : felt) -> (amount : felt) {
+    }
+    // Set order balance for user
+    func set_order_balance(user : felt, asset : felt, new_amount : felt) {
+    }
+}
+
 //
 // Storage vars
 // 
 
-// Stores user balances.
+// Stores orders in doubly linked lists.
 @storage_var
-func account_balances(user : felt, asset : felt) -> (amount : felt) {
-}
-// Stores user balances locked in open orders.
-@storage_var
-func order_balances(user : felt, asset : felt) -> (amount : felt) {
+func l2_storage_contract_address() -> (addr : felt) {
 }
 
 namespace Balances {
@@ -24,6 +36,15 @@ namespace Balances {
     //
     // Functions
     //
+
+    // Initialiser function
+    // @dev Called by GatewayContract on deployment
+    func initialise{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        _l2_storage_contract_address
+    ) {
+        l2_storage_contract_address.write(_l2_storage_contract_address);
+        return ();
+    }
 
     // Getter for user balances
     // @param user : User EOA
@@ -33,11 +54,12 @@ namespace Balances {
     func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, in_account : felt
     ) -> (amount : felt) {
+        let (storage_addr) = l2_storage_contract_address.read();
         if (in_account == 1) {
-            let (amount) = account_balances.read(user, asset);
+            let (amount) = IStorageContract.get_account_balance(storage_addr, user, asset);
             return (amount=amount);
         } else {
-            let (amount) = order_balances.read(user, asset);
+            let (amount) = IStorageContract.get_order_balance(storage_addr, user, asset);
             return (amount=amount);
         }
     }
@@ -50,11 +72,12 @@ namespace Balances {
     func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, in_account : felt, new_amount : felt
     ) {
+        let (storage_addr) = l2_storage_contract_address.read();
         if (in_account == 1) {
-            account_balances.write(user, asset, new_amount);
+            IStorageContract.set_account_balance(storage_addr, user, asset, new_amount);
             return ();
         } else {
-            order_balances.write(user, asset, new_amount);
+            IStorageContract.set_order_balance(storage_addr, user, asset, new_amount);
             return ();
         }
     }
