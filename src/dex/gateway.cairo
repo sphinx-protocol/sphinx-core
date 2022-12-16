@@ -78,12 +78,10 @@ func is_eth_remote_eip_712_set() -> (bool : felt) {
 
 @constructor
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    owner : felt
+    owner : felt, storage_addr : felt
 ) {
     Ownable.initializer(owner);
-    Orders.initialise();
-    Limits.initialise();
-    Markets.initialise();
+    Orders.initialise(storage_addr);
     return ();
 }
 

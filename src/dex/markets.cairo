@@ -16,44 +16,46 @@ from src.dex.events import (
 )
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
-//
-// Storage vars
-//
+@contract_interface
+namespace IStorageContract {
+    // Get market by market ID
+    func get_market(market_id : felt) -> (market : Market) {
+    }
+    // Set market by market ID
+    func set_market(market_id : felt, new_market : Market) {
+    }
+    // Get market ID by base and quote asset addresses
+    func get_market_id(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
+    }
+    // Set market ID by base and quote asset addresses
+    func set_market_id(base_asset : felt, quote_asset : felt, new_market_id : felt) {
+    }
+    // Get root node of tree based on tree ID
+    func get_tree(tree_id : felt) -> (root_id : felt) {
+    }
+    // Set root node of tree based on tree ID
+    func set_tree(tree_id : felt, new_root_id : felt) {
+    }
+    // Get current market ID
+    func get_curr_market_id() -> (id : felt) {
+    }
+    // Set current market ID
+    func set_curr_market_id(new_id : felt) {
+    }
+    // Get current tree ID
+    func get_curr_tree_id() -> (id : felt) {
+    }
+    // Set current tree ID
+    func set_curr_tree_id(new_id : felt) {
+    }
+}
 
-// Stores active markets.
-@storage_var
-func markets(id : felt) -> (market : Market) {
-}
-// Stores on-chain mapping of asset addresses to market id.
-@storage_var
-func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
-}
-// Stores pointers to bid and ask limit trees.
-@storage_var
-func trees(id : felt) -> (root_id : felt) {
-}
-// Stores latest market id.
-@storage_var
-func curr_market_id() -> (id : felt) {
-}
-// Stores latest tree id.
-@storage_var
-func curr_tree_id() -> (id : felt) {
-}
 
 namespace Markets {
 
     //
     // Functions
     //
-
-    // Initialiser function
-    // @dev Called by GatewayContract on deployment
-    func initialise{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-        curr_market_id.write(1);
-        curr_tree_id.write(1);
-        return ();
-    }
 
     // Get market ID given two assets (or 0 if one doesn't exist).
     // @param base_asset : felt representation of ERC20 base asset contract address
@@ -62,10 +64,11 @@ namespace Markets {
     func get_market_ids{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         base_asset : felt, quote_asset : felt) -> (market_id : felt
     ) {
-        let (market_id) = market_ids.read(base_asset, quote_asset);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market_id) = IStorageContract.get_market_id(storage_addr, base_asset, quote_asset);
         if (market_id == 0) {
             // Checks for reverse order
-            let (alt_market_id) = market_ids.read(quote_asset, base_asset);
+            let (alt_market_id) = IStorageContract.get_market_id(storage_addr, quote_asset, base_asset);
             return (market_id=alt_market_id);
         } else {
             return (market_id=market_id);
@@ -77,7 +80,8 @@ namespace Markets {
     // @return market : retrieved market
     func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (market_id : felt
     ) -> (market : Market) {
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         return (market=market);
     }
 
@@ -89,22 +93,23 @@ namespace Markets {
     ) -> (new_market : Market) {
         alloc_locals;
         
+        let (storage_addr) = Orders.get_storage_address();
         let (existing_market_id) = get_market_ids(base_asset, quote_asset);
         let market_exists = is_le(1, existing_market_id);
         assert market_exists = 0;
 
-        let (market_id) = curr_market_id.read();
-        let (tree_id) = curr_tree_id.read();
+        let (market_id) = IStorageContract.get_curr_market_id(storage_addr, );
+        let (tree_id) = IStorageContract.get_curr_tree_id(storage_addr, );
 
         tempvar new_market: Market* = new Market(
             id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
             base_asset=base_asset, quote_asset=quote_asset
         );
-        markets.write(market_id, [new_market]);
+        IStorageContract.set_market(storage_addr, market_id, [new_market]);
 
-        curr_market_id.write(market_id + 1);
-        curr_tree_id.write(tree_id + 2);
-        market_ids.write(base_asset, quote_asset, market_id);
+        IStorageContract.set_curr_market_id(storage_addr, market_id + 1);
+        IStorageContract.set_curr_tree_id(storage_addr, tree_id + 2);
+        IStorageContract.set_market_id(storage_addr, base_asset, quote_asset, market_id);
 
         log_create_market.emit(
             id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
@@ -118,7 +123,8 @@ namespace Markets {
     func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         market_id : felt, lowest_ask : felt, highest_bid : felt
     ) -> (success : felt) {
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         if (market.id == 0) {
             return (success=0);
         }
@@ -126,7 +132,7 @@ namespace Markets {
             id=market_id, bid_tree_id=market.bid_tree_id, ask_tree_id=market.ask_tree_id, lowest_ask=lowest_ask, 
             highest_bid=highest_bid, base_asset=market.base_asset, quote_asset=market.quote_asset
         );
-        markets.write(market_id, [new_market]);
+        IStorageContract.set_market(storage_addr, market_id, [new_market]);
         return (success=1);
     }
 
@@ -142,7 +148,8 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (limit, _) = Limits.find(price, market.bid_tree_id);
         let (lowest_ask) = Orders.get_order(market.lowest_ask);
 
@@ -203,6 +210,7 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
+        let (storage_addr) = Orders.get_storage_address();
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         let balance_sufficient = is_le(amount, account_balance);
         if (balance_sufficient == 0) {
@@ -252,7 +260,8 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (limit, _) = Limits.find(price, market.ask_tree_id);
         let (highest_bid) = Orders.get_order(market.highest_bid);
 
@@ -312,6 +321,7 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
+        let (storage_addr) = Orders.get_storage_address();
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
         let balance_sufficient = is_le(amount, account_balance);
         if (balance_sufficient == 0) {
@@ -359,7 +369,8 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (lowest_ask) = Orders.get_order(market.lowest_ask);
         let (_, base_amount, quote_amount) = fetch_quote(market.base_asset, market.quote_asset, 1, amount);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
@@ -467,7 +478,8 @@ namespace Markets {
     ) -> (success : felt) {
         alloc_locals;
 
-        let (market) = markets.read(market_id);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (_, base_amount, quote_amount) = fetch_quote(market.base_asset, market.quote_asset, 0, amount);
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
         let is_sufficient = is_le(quote_amount, account_balance);
@@ -564,6 +576,7 @@ namespace Markets {
     ) {
         alloc_locals;
 
+        let (storage_addr) = Orders.get_storage_address();
         let (order) = Orders.get_order(order_id);
         let (update_orders_success) = Orders.remove(order_id);
         // %{ print("update_orders_success: {}".format(ids.update_orders_success)) %}
@@ -578,7 +591,7 @@ namespace Markets {
             assert update_limit_success = 1;
         }
 
-        let (market) = markets.read(limit.market_id);
+        let (market) = IStorageContract.get_market(storage_addr, limit.market_id);
 
         // %{ print("order.is_buy: {}".format(ids.order.is_buy)) %}
         if (order.is_buy == 1) {
