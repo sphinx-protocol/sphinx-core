@@ -4,6 +4,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
+from src.dex.orders import Orders
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
 @contract_interface
@@ -22,29 +23,11 @@ namespace IStorageContract {
     }
 }
 
-//
-// Storage vars
-// 
-
-// Stores orders in doubly linked lists.
-@storage_var
-func l2_storage_contract_address() -> (addr : felt) {
-}
-
 namespace Balances {
 
     //
     // Functions
     //
-
-    // Initialiser function
-    // @dev Called by GatewayContract on deployment
-    func initialise{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        _l2_storage_contract_address
-    ) {
-        l2_storage_contract_address.write(_l2_storage_contract_address);
-        return ();
-    }
 
     // Getter for user balances
     // @param user : User EOA
@@ -54,7 +37,7 @@ namespace Balances {
     func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, in_account : felt
     ) -> (amount : felt) {
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = Orders.get_storage_address();
         if (in_account == 1) {
             let (amount) = IStorageContract.get_account_balance(storage_addr, user, asset);
             return (amount=amount);
@@ -72,7 +55,7 @@ namespace Balances {
     func set_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, in_account : felt, new_amount : felt
     ) {
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = Orders.get_storage_address();
         if (in_account == 1) {
             IStorageContract.set_account_balance(storage_addr, user, asset, new_amount);
             return ();

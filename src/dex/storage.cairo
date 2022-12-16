@@ -2,6 +2,7 @@
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
+from lib.openzeppelin.access.ownable.library import Ownable
 from src.dex.structs import Order, Limit, Market
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
@@ -13,7 +14,7 @@ from src.utils.handle_revoked_refs import handle_revoked_refs
 @storage_var
 func l2_gateway_contract_address() -> (addr : felt) {
 }
-// Contract address for L2GatewayContract
+// Contract owner
 @storage_var
 func owner() -> (addr : felt) {
 }
@@ -90,6 +91,7 @@ func order_balances(user : felt, asset : felt) -> (amount : felt) {
 func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     _owner : felt
 ) {
+    Ownable.initializer(_owner);
     owner.write(_owner);
     curr_order_id.write(1);
     curr_limit_id.write(1);
@@ -370,5 +372,41 @@ func set_curr_tree_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 ) {
     assert_only_gateway();
     curr_tree_id.write(new_tree_id);
+    return ();
+}
+
+@view
+func get_account_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt
+) -> (amount : felt) {
+    assert_gateway_or_owner();
+    let (amount) = account_balances.read(user, asset);
+    return (amount=amount);
+}
+
+@external
+func set_account_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, new_amount : felt
+) {
+    assert_only_gateway();
+    account_balances.write(user, asset, new_amount);
+    return ();
+}
+
+@view
+func get_order_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt
+) -> (amount : felt) {
+    assert_gateway_or_owner();
+    let (amount) = order_balances.read(user, asset);
+    return (amount=amount);
+}
+
+@external
+func set_order_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    user : felt, asset : felt, new_amount : felt
+) {
+    assert_only_gateway();
+    order_balances.write(user, asset, new_amount);
     return ();
 }

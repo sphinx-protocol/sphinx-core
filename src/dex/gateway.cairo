@@ -82,8 +82,6 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 ) {
     Ownable.initializer(owner);
     Orders.initialise(storage_addr);
-    Limits.initialise(storage_addr);
-    Markets.initialise(storage_addr);
     return ();
 }
 

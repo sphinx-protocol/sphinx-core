@@ -67,6 +67,15 @@ namespace Orders {
         return ();
     }
 
+    // Set addresses of external contracts
+    // @dev Can only be called by contract owner
+    // @return l2_storage_contract_address : deployed contract address of L2StorageContract
+    func get_storage_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} (
+    ) -> (storage_addr : felt) {
+        let (storage_addr) = l2_storage_contract_address.read();
+        return (storage_addr=storage_addr);
+    }
+
     // Getter for head ID and tail ID.
     func get_head_and_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         limit_id : felt
