@@ -322,7 +322,7 @@ func market_buy_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.buy(user, market_id, MAX_FELT, amount);
+    let (success) = Markets.buy(user, market_id, MAX_FELT, 0, amount);
     with_attr error_message("[Gateway] market_buy_helper > Market buy unsuccessful") {
         assert success = 1;
     }
@@ -365,7 +365,7 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.sell(user, market_id, 0, amount);
+    let (success) = Markets.sell(user, market_id, 0, 0, amount);
     with_attr error_message("[Gateway] market_sell_helper > Market sell unsuccessful") {
         assert success = 1;
     }

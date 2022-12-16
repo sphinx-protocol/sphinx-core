@@ -165,7 +165,7 @@ namespace Markets {
             handle_revoked_refs();
             if (is_market_order == 1) {
                 if (post_only == 0) {
-                    let (buy_order_success) = buy(caller, market.id, price, amount);
+                    let (buy_order_success) = buy(caller, market.id, price, 0, amount);
                     assert buy_order_success = 1;
                     handle_revoked_refs();
                     return (success=1);
@@ -277,7 +277,7 @@ namespace Markets {
             let is_market_order = is_le(price, highest_bid.price);
             if (is_market_order == 1) {
                 if (post_only == 0) {
-                    let (sell_order_success) = sell(caller, market.id, price, amount);
+                    let (sell_order_success) = sell(caller, market.id, price, 0, amount);
                     assert sell_order_success = 1;
                     handle_revoked_refs();
                     return (success=1);
@@ -438,8 +438,7 @@ namespace Markets {
             return (success=1);
         } else {
             // Fill entire order
-            Orders.set_filled(lowest_ask.id, lowest_ask.amount);
-            delete(caller, lowest_ask.id);
+            delete(lowest_ask.id);
             let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, 1000000000000000000);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             // %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
@@ -482,7 +481,7 @@ namespace Markets {
         }
 
         let (highest_bid) = Orders.get_order(market.highest_bid);
-        let (base_amount) = unsigned_div_rem(quote_amount * highest_bid.price, 1000000000000000000);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid.price, 1000000000000000000);
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
 
         let is_sufficient = is_le(quote_amount, account_balance);
@@ -536,8 +535,7 @@ namespace Markets {
             return (success=1);
         } else {
             // Fill entire order
-            Orders.set_filled(highest_bid.id, highest_bid.amount);
-            delete(caller, highest_bid.id);
+            delete(highest_bid.id);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, quote_amount);
             with_attr error_message("[Markets] sell > Transfer balance 1 unsuccessful") {
                 assert transfer_balance_success_1 = 1;
@@ -570,6 +568,7 @@ namespace Markets {
 
         let (storage_addr) = Orders.get_storage_address();
         let (order) = Orders.get_order(order_id);
+        // %{ print("order.amount: {}, order.filled: {}".format(ids.order.amount, ids.order.filled)) %}
         let (update_orders_success) = Orders.remove(order_id);
         // %{ print("update_orders_success: {}".format(ids.update_orders_success)) %}
         with_attr error_message("[Markets] delete > Update orders unsuccessful") {
@@ -581,7 +580,7 @@ namespace Markets {
 
         // %{ print("order.is_buy: {}".format(ids.order.is_buy)) %}
         if (order.is_buy == 1) {
-            // %{ print("new_head_id: {}".format(ids.new_head_id)) %}
+            // %{ print("limit.length: {}".format(ids.limit.length)) %}
             if (limit.length == 1) {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_max(limit.tree_id);
@@ -623,7 +622,7 @@ namespace Markets {
             }
             handle_revoked_refs();
         } else {
-            // %{ print("new_head_id: {}".format(ids.new_head_id)) %}
+            // %{ print("limit.length: {}".format(ids.limit.length)) %}
             if (limit.length == 1) {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_min(limit.tree_id);
