@@ -160,6 +160,10 @@ func test_gateway{
     IGatewayContract.market_buy(gateway_addr, base_asset, quote_asset, 1100 * 1000000000000000);
     %{ stop_prank_callable() %}
 
+    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
+    IGatewayContract.cancel_order(gateway_addr, 1);
+    %{ stop_prank_callable() %}
+
     let (buyer_base_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 1);
     let (buyer_base_locked_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 0);
     let (buyer_quote_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, quote_asset, 1);

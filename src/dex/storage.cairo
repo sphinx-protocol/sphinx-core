@@ -104,6 +104,15 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // Functions
 //
 
+// Get external contract address
+// @return l2_gateway_contract_address : deployed contract address of L2GatewayContract
+@view
+func get_gateway_address{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check_ptr} (
+) -> (gateway_addr : felt) {
+    let (gateway_addr) = l2_gateway_contract_address.read();
+    return (gateway_addr=gateway_addr);
+}
+
 // Set external contract address
 // @dev Can only be called by contract owner
 // @param _l2_gateway_contract_address : deployed contract address of L2GatewayContract

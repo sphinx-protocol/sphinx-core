@@ -1,9 +1,10 @@
 [project]
-protostar-version = "0.8.1"
+protostar-version = "0.9.0"
 lib-path = "lib"
 
 [contracts]
 gateway = ["src/dex/gateway.cairo"]
+storage = ["src/dex/storage.cairo"]
 l2EthRemoteCore = ["src/crosschain/l2_eth_remote_core.cairo"]
 l2EthRemoteEIP712 = ["src/crosschain/l2_eth_remote_eip_712.cairo"]
 ERC20 = ["src/ERC20/ERC20.cairo"]
