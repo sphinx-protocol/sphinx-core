@@ -8,7 +8,7 @@ from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.default_dict import default_dict_new
 from starkware.cairo.common.dict import dict_write, dict_read
 from src.dex.orders import Orders
-from src.dex.structs import Limit
+from src.dex.structs import Order, Limit
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
 @contract_interface
@@ -417,11 +417,8 @@ namespace Limits {
         let (prices : felt*) = alloc();
         let (amounts : felt*) = alloc();
 
-        let (left) = IStorageContract.get_limit(storage_addr, root.left_id);
-        let (left_length) = get_limit_tree_length(left);
-        view_limit_tree_helper{prices=prices, amounts=amounts}(node=root, idx=left_length);
+        let (length) = view_limit_tree_helper{prices=prices, amounts=amounts}(node=root, idx=0);
 
-        let (length) = get_limit_tree_length(root);
         return (prices=prices, amounts=amounts, length=length);
     }
 
@@ -434,53 +431,71 @@ namespace Limits {
         range_check_ptr, 
         prices : felt*,
         amounts : felt*,
-    } (node : Limit, idx : felt) {
+    } (node : Limit, idx : felt) -> (length : felt) {
         alloc_locals;
 
+        let (storage_addr) = Orders.get_storage_address();
+        let (new_idx) = traverse_left_branch(node=node, idx=idx);
+        
+        let (new_idx_2) = array_append{array=prices}(val=node.price, idx=new_idx);
+        array_append{array=amounts}(val=node.total_vol, idx=new_idx);
+
+        let (new_idx_3) = traverse_right_branch(node=node, idx=new_idx_2);
+
+        return (length=new_idx_3);
+    }
+
+    // Helper function to traverse left branch and return new index
+    // @param node : node in current iteration of function
+    // @param idx : index in current iteration of function
+    // @return new_idx : new index of array
+    func traverse_left_branch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, prices : felt*, amounts : felt*} (
+        node : Limit, idx : felt,
+    ) -> (new_idx : felt) {
+        alloc_locals;
+        
         let (storage_addr) = Orders.get_storage_address();
         if (node.left_id == 0) {
             handle_revoked_refs_alt();
+            return (new_idx=idx);
         } else {
             let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
-            let (left_right_child) = IStorageContract.get_limit(storage_addr, left.right_id);
-            let (left_right_child_length) = get_limit_tree_length(left_right_child);
-            view_limit_tree_helper(left, idx - left_right_child_length - 1);
+            let (new_idx) = view_limit_tree_helper(left, idx);
             handle_revoked_refs_alt();
+            return (new_idx=new_idx);
         }
-
-        if (node.right_id == 0) {
-            handle_revoked_refs_alt();
-        } else {
-            handle_revoked_refs_alt();
-            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
-            let (right_left_child) = IStorageContract.get_limit(storage_addr, right.left_id);
-            let (right_left_child_length) = get_limit_tree_length(right_left_child);
-            view_limit_tree_helper(right, idx + right_left_child_length + 1);
-        }
-
-        assert prices[idx] = node.price;
-        assert amounts[idx] = node.total_vol;
-
-        return ();
     }
 
-    // Helper function to get length of limit tree
-    // @param node : node in current iteration of function (starts from root)
-    // @return length : length of limit tree
-    func get_limit_tree_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        node : Limit
-    ) -> (length : felt) {
+    // Helper function to traverse right branch and return new index
+    // @param node : node in current iteration of function
+    // @param idx : index in current iteration of function
+    // @return new_idx : new index of array
+    func traverse_right_branch{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, prices : felt*, amounts : felt*} (
+        node : Limit, idx : felt,
+    ) -> (new_idx : felt) {
         alloc_locals;
+
         let (storage_addr) = Orders.get_storage_address();
-        if (node.id == 0) {
-            return (length=0);
+        if (node.right_id == 0) {
+            handle_revoked_refs_alt();
+            return (new_idx=idx);
         } else {
-            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
             let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
-            let (left_length) = get_limit_tree_length(left);
-            let (right_length) = get_limit_tree_length(right);
-            return (length=1+left_length+right_length);
+            let (new_idx) = view_limit_tree_helper(right, idx);
+            handle_revoked_refs_alt();
+            return (new_idx=new_idx);
         }
+    }
+
+    // Helper function to append to array and return new index
+    // @param array : array to append to
+    // @param val : value to append
+    // @return new_idx : new index of array
+    func array_append{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, array : felt*} (
+        val : felt, idx: felt
+    ) -> (new_idx : felt) {
+        assert array[idx] = val;
+        return (new_idx = idx + 1);
     }
 
     // Utility function to return all orders in a limit tree, from left to right.
@@ -504,12 +519,8 @@ namespace Limits {
         let (owners : felt*) = alloc();
         let (ids : felt*) = alloc();
 
-        let (left) = IStorageContract.get_limit(storage_addr, root.left_id);
-        let (left_length) = get_limit_tree_order_length(left);
+        let (length) = view_limit_tree_orders_helper{prices=prices, amounts=amounts, owners=owners, ids=ids}(node=root, idx=0);
 
-        view_limit_tree_orders_helper{prices=prices, amounts=amounts, owners=owners, ids=ids}(node=root, idx=left_length);
-
-        let (length) = get_limit_tree_order_length(root);
         return (prices=prices, amounts=amounts, owners=owners, ids=ids, length=length);
     }
 
@@ -524,79 +535,102 @@ namespace Limits {
         amounts : felt*,
         owners : felt*,
         ids : felt*,
-    } (node : Limit, idx : felt) {
+    } (node : Limit, idx : felt) -> (length: felt) {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        if (node.left_id == 0) {
-            handle_revoked_refs_alt_2();
-        } else {
-            let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
-            let (left_right_child) = IStorageContract.get_limit(storage_addr, left.right_id);
-            let (left_right_child_length) = get_limit_tree_order_length(left_right_child);
-            view_limit_tree_orders_helper(left, idx - left_right_child_length - left.length);
-            handle_revoked_refs_alt_2();
-        }
+        let (new_idx) = traverse_left_branch_orders(node=node, idx=idx);
+        
+        let (head_order) = Orders.get_order(node.head_id);
+        let (new_idx_2) = array_append_orders{prices=prices, amounts=amounts, owners=owners, ids=ids}(order=head_order, idx=new_idx);
 
-        if (node.right_id == 0) {
-            handle_revoked_refs_alt_2();
-        } else {
-            handle_revoked_refs_alt_2();
-            let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
-            let (right_left_child) = IStorageContract.get_limit(storage_addr, right.left_id);
-            let (right_left_child_length) = get_limit_tree_order_length(right_left_child);
-            view_limit_tree_orders_helper(right, idx + right_left_child_length + node.length);
-        }
-        
-        fill_orders_helper(node.head_id, idx);
-        
-        return ();
+        let (new_idx_3) = traverse_right_branch_orders(node=node, idx=new_idx_2);
+
+        return (length=new_idx_3);
     }
 
-    func fill_orders_helper{
+    // Helper function to traverse orders of left branch and return new index
+    // @param node : node in current iteration of function
+    // @param idx : index in current iteration of function
+    // @return new_idx : new index of array
+    func traverse_left_branch_orders{
         syscall_ptr: felt*, 
         pedersen_ptr: HashBuiltin*, 
         range_check_ptr, 
-        prices : felt*,
-        amounts : felt*,
-        owners : felt*,
-        ids : felt*,
-    } (curr_order_id : felt, idx : felt) {
+        prices : felt*, 
+        amounts : felt*, 
+        owners : felt*, 
+        ids : felt*
+    } (node : Limit, idx : felt) -> (new_idx : felt) {
         alloc_locals;
         
         let (storage_addr) = Orders.get_storage_address();
-        let (curr) = Orders.get_order(curr_order_id);
-
-        assert prices[idx] = curr.price;
-        assert amounts[idx] = curr.amount;
-        assert owners[idx] = curr.owner;
-        assert ids[idx] = curr.id;
-
-        if (curr.next_id == 0) {
-            handle_revoked_refs_alt_2();
-        } else {
-            handle_revoked_refs_alt_2();
-            fill_orders_helper(curr.next_id, idx + 1);
-        }
-        return ();
-    }
-
-    // Helper function to get length of limit tree in number of orders
-    // @param node : node in current iteration of function (starts from root)
-    // @return length : length of limit tree in number of orders
-    func get_limit_tree_order_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        node : Limit
-    ) -> (length : felt) {
-        alloc_locals;
-        let (storage_addr) = Orders.get_storage_address();
-        if (node.id == 0) {
-            return (length=0);
+        if (node.left_id == 0) {
+            handle_revoked_refs_alt();
+            return (new_idx=idx);
         } else {
             let (left) = IStorageContract.get_limit(storage_addr, node.left_id);
+            let (new_idx) = view_limit_tree_orders_helper(left, idx);
+            handle_revoked_refs_alt();
+            return (new_idx=new_idx);
+        }
+    }
+
+    // Helper function to traverse orders of right branch and return new index
+    // @param node : node in current iteration of function
+    // @param idx : index in current iteration of function
+    // @return new_idx : new index of array
+    func traverse_right_branch_orders{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr, 
+        prices : felt*, 
+        amounts : felt*, 
+        owners : felt*, 
+        ids : felt*
+    } (node : Limit, idx : felt) -> (new_idx : felt) {
+        alloc_locals;
+
+        let (storage_addr) = Orders.get_storage_address();
+        if (node.right_id == 0) {
+            handle_revoked_refs_alt_2();
+            return (new_idx=idx);
+        } else {
             let (right) = IStorageContract.get_limit(storage_addr, node.right_id);
-            let (left_length) = get_limit_tree_order_length(left);
-            let (right_length) = get_limit_tree_order_length(right);
-            return (length=node.length+left_length+right_length);
+            let (new_idx) = view_limit_tree_orders_helper(right, idx);
+            handle_revoked_refs_alt_2();
+            return (new_idx=new_idx);
+        }
+    }
+
+    func array_append_orders{
+        syscall_ptr: felt*, 
+        pedersen_ptr: HashBuiltin*, 
+        range_check_ptr, 
+        prices : felt*, 
+        amounts : felt*, 
+        owners : felt*, 
+        ids : felt*
+    } (order : Order, idx: felt) -> (new_idx : felt) {
+        if (order.id == 0) {
+            handle_revoked_refs_alt_2();
+            return (new_idx=idx);
+        } else {
+            handle_revoked_refs_alt_2();
+        }
+        
+        assert prices[idx] = order.price;
+        assert amounts[idx] = order.amount;
+        assert owners[idx] = order.owner;
+        assert ids[idx] = order.id;
+
+        if (order.next_id == 0) {
+            handle_revoked_refs_alt_2();
+            return (new_idx=idx + 1);
+        } else {
+            let (next_order) = Orders.get_order(order.next_id);
+            let (new_idx) = array_append_orders(next_order, idx+1);
+            return (new_idx=new_idx);
         }
     }
 

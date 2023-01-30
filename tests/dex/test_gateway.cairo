@@ -151,17 +151,17 @@ func test_gateway{
     %{ stop_prank_callable() %}
 
     // Place bids as buyer
-    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1250 * 1000000000000000000, 1000 * 1000000000000000, 1);
-    IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1200 * 1000000000000000000, 500 * 1000000000000000, 1);
-    %{ stop_prank_callable() %}
+    // %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
+    // IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1250 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    // IGatewayContract.create_ask(gateway_addr, base_asset, quote_asset, 1200 * 1000000000000000000, 500 * 1000000000000000, 1);
+    // %{ stop_prank_callable() %}
 
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.market_buy(gateway_addr, base_asset, quote_asset, 1100 * 1000000000000000);
-    %{ stop_prank_callable() %}
-
-    %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.cancel_order(gateway_addr, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1100 * 1000000000000000, 500 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1000 * 1000000000000000, 250 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1230 * 1000000000000000, 750 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1200 * 1000000000000000, 900 * 1000000000000000, 1);
+    IGatewayContract.create_bid(gateway_addr, base_asset, quote_asset, 1100 * 1000000000000000, 220 * 1000000000000000, 1);
     %{ stop_prank_callable() %}
 
     let (buyer_base_account_balance) = IGatewayContract.get_balance(gateway_addr, buyer, base_asset, 1);
@@ -191,16 +191,27 @@ func test_gateway{
     // %{ print("Amounts:") %}
     // print_list(aob_amounts, aob_amounts_len);
 
-    let (prices_len, prices, amounts_len, amounts, owners_len, owners, ids_len, ids) = IGatewayContract.view_order_book_orders(gateway_addr, base_asset, quote_asset, 0);
+    let (bob_prices_len, bob_prices, bob_amounts_len, bob_amounts, bob_owners_len, bob_owners, bob_ids_len, bob_ids) = IGatewayContract.view_order_book_orders(gateway_addr, base_asset, quote_asset, 1);
+    %{ "Bid order book" %}
+    %{ print("Prices:") %}
+    print_list(bob_prices, bob_prices_len);
+    %{ print("Amounts:") %}
+    print_list(bob_amounts, bob_amounts_len);
+    %{ print("Owners:") %}
+    print_list(bob_owners, bob_owners_len);
+    %{ print("IDs:") %}
+    print_list(bob_ids, bob_ids_len);
+
+    let (aob_prices_len, aob_prices, aob_amounts_len, aob_amounts, aob_owners_len, aob_owners, aob_ids_len, aob_ids) = IGatewayContract.view_order_book_orders(gateway_addr, base_asset, quote_asset, 0);
     %{ "Ask order book" %}
     %{ print("Prices:") %}
-    print_list(prices, prices_len);
+    print_list(aob_prices, aob_prices_len);
     %{ print("Amounts:") %}
-    print_list(amounts, amounts_len);
+    print_list(aob_amounts, aob_amounts_len);
     %{ print("Owners:") %}
-    print_list(owners, owners_len);
-    %{ print("Ids:") %}
-    print_list(ids, ids_len);
+    print_list(aob_owners, aob_owners_len);
+    %{ print("IDs:") %}
+    print_list(aob_ids, aob_ids_len);
 
     return ();
 }
