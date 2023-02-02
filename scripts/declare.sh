@@ -3,8 +3,13 @@ export STARKNET_WALLET=starkware.starknet.wallets.open_zeppelin.OpenZeppelinAcco
 
 starknet new_account
 
+# Starknet Goerli2:
 # Account address: 0x073c76885b035632c9b6c4cdf3b4aaf4f02eb376ff067ba5f787402a8e4f78e1
 # Public key: 0x0238526cb2968849c2ee68341b577401e30121680c7c56f6df8297eb60ad3f39
+
+# Starknet Goerli:
+# Account address: 0x06409e2df51458939bfb3156f32139e9594595455109abf20c6077c6788d788d
+# Public key: 0x0010b6ba8609de353137f94664043420259deb81c761218354fa6621f1167761
 
 # TODO: Send some ETH to account address (wait for tx to be accepted)
 
@@ -13,10 +18,15 @@ starknet deploy_account
 starknet declare --contract build/gateway.json
 starknet declare --contract build/storage.json
 
+# Starknet Goerli2:
 # Storage Contract class hash: 0x71b704ea7ceaa479b77c6d87a4b9fd6c84513d6130032d3bac03749ecc9fe2a
 # Gateway Contract class hash: 0x798cba82d984fed80b5c906c8cc9ea1fc658b4225303ea614cfc3b2c7b9045b
 # L2EthRemoteCore contract class hash: 0x5bfac950a390abd457bd28347e072b5876dd967950fda4c23d161ccb4466815
 # L2EthRemoteEIP712 contract class hash: 0x54b505dd2f4b45b2d7cb15c8b8b62cdbf260dfa0998da5eead09213da7f7ce4
+
+# Starknet Goerli:
+# Storage Contract class hash: 0x71b704ea7ceaa479b77c6d87a4b9fd6c84513d6130032d3bac03749ecc9fe2a
+# Gateway Contract class hash: 0x798cba82d984fed80b5c906c8cc9ea1fc658b4225303ea614cfc3b2c7b9045b
 
 # Deploy contract by interacting with UDC: 0x041a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf
 # Link: https://testnet-2.starkscan.co/contract/0x041a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf#write-contract
