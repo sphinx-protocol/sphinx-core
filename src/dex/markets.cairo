@@ -6,6 +6,7 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from starkware.starknet.common.syscalls import get_block_timestamp
+from starkware.cairo.common.pow import pow
 
 from src.dex.orders import Orders
 from src.dex.limits import Limits
@@ -48,8 +49,19 @@ namespace IStorageContract {
     // Set current tree ID
     func set_curr_tree_id(new_id : felt) {
     }
+    // Get base asset decimals
+    func get_base_decimals(market_id : felt) -> (decimals : felt) {
+    }
+    // Set base asset decimals
+    func set_base_decimals(market_id : felt, decimals : felt) {
+    }
+    // Get quote asset decimals
+    func get_quote_decimals(market_id : felt) -> (decimals : felt) {
+    }
+    // Set quote asset decimals
+    func set_quote_decimals(market_id : felt, decimals : felt) {
+    }
 }
-
 
 namespace Markets {
 
@@ -89,7 +101,7 @@ namespace Markets {
     // @param base_asset : felt representation of ERC20 base asset contract address
     // @param quote_asset : felt representation of ERC20 quote asset contract address
     func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        base_asset : felt, quote_asset : felt
+        base_asset : felt, quote_asset : felt, base_decimals : felt, quote_decimals : felt
     ) -> (new_market : Market) {
         alloc_locals;
         
@@ -110,6 +122,9 @@ namespace Markets {
         IStorageContract.set_curr_market_id(storage_addr, market_id + 1);
         IStorageContract.set_curr_tree_id(storage_addr, tree_id + 2);
         IStorageContract.set_market_id(storage_addr, base_asset, quote_asset, market_id);
+
+        IStorageContract.set_base_decimals(storage_addr, market_id, base_decimals);
+        IStorageContract.set_quote_decimals(storage_addr, market_id, quote_decimals);
 
         log_create_market.emit(
             id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
@@ -165,9 +180,9 @@ namespace Markets {
             handle_revoked_refs();
             if (is_market_order == 1) {
                 if (post_only == 0) {
+                    handle_revoked_refs();
                     let (buy_order_success) = buy(caller, market.id, price, 0, amount);
                     assert buy_order_success = 1;
-                    handle_revoked_refs();
                     return (success=1);
                 } else {
                     handle_revoked_refs();
@@ -182,17 +197,17 @@ namespace Markets {
         // Otherwise, place limit order
         if (limit.id == 0) {
             // Limit tree doesn't exist yet, insert new limit tree
+            handle_revoked_refs();
             let (new_limit) = Limits.insert(price, market.bid_tree_id, market.id);
             let create_limit_success = is_le(1, new_limit.id);
             assert create_limit_success = 1;
             let (create_bid_success) = create_bid_helper(caller, market, new_limit, price, amount, post_only);
             assert create_bid_success = 1;
-            handle_revoked_refs();
         } else {
             // Add order to limit tree
+            handle_revoked_refs();
             let (create_bid_success) = create_bid_helper(caller, market, limit, price, amount, post_only);
             assert create_bid_success = 1;
-            handle_revoked_refs();
         }
         
         return (success=1);
@@ -236,8 +251,11 @@ namespace Markets {
             assert update_market_success = 1;
             handle_revoked_refs();
         }
-        let (order_size, _) = unsigned_div_rem(amount * price, 1000000000000000000);
-        let (update_balance_success) = Balances.transfer_to_order(caller, market.base_asset, order_size);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+        let (order_size_in_base, _) = unsigned_div_rem(amount * price, denominator);
+        let (update_balance_success) = Balances.transfer_to_order(caller, market.base_asset, order_size_in_base);
         assert update_balance_success = 1;
 
         log_create_bid.emit(
@@ -347,6 +365,8 @@ namespace Markets {
             assert update_market_success = 1;
             handle_revoked_refs();
         }
+        let (denominator) = pow(10, 18);
+        let (order_size_in_quote, _) = unsigned_div_rem(amount * price, denominator);
         let (update_balance_success) = Balances.transfer_to_order(caller, market.quote_asset, amount);
         assert update_balance_success = 1;
 
@@ -378,7 +398,10 @@ namespace Markets {
         }
 
         let (lowest_ask) = Orders.get_order(market.lowest_ask);
-        let (base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask.price, 1000000000000000000);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         
         let is_sufficient = is_le(base_amount, account_balance);
@@ -439,7 +462,8 @@ namespace Markets {
         } else {
             // Fill entire order
             delete(lowest_ask.id);
-            let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, 1000000000000000000);
+            let (price_units) = pow(10, 18);
+            let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, price_units);
             let (transfer_balance_success_1) = Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             // %{ print("transfer_balance_success_1: {}".format(ids.transfer_balance_success_1)) %}
             with_attr error_message("[Markets] buy > Transfer balance 1 unsuccessful") {
@@ -481,7 +505,10 @@ namespace Markets {
         }
 
         let (highest_bid) = Orders.get_order(market.highest_bid);
-        let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid.price, 1000000000000000000);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
 
         let is_sufficient = is_le(quote_amount, account_balance);
@@ -540,7 +567,8 @@ namespace Markets {
             with_attr error_message("[Markets] sell > Transfer balance 1 unsuccessful") {
                 assert transfer_balance_success_1 = 1;
             }
-            let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, 1000000000000000000);
+            let (price_units) = pow(10, 18);
+            let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, price_units);
             let (transfer_balance_success_2) = Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, updated_base_amount);
             with_attr error_message("[Markets] sell > Transfer balance 2 unsuccessful") {
                 assert transfer_balance_success_2 = 1;
@@ -614,7 +642,10 @@ namespace Markets {
                 }
                 handle_revoked_refs();     
             }
-            let (order_base_balance, _) = unsigned_div_rem((order.amount - order.filled) * order.price, 1000000000000000000);
+            let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+            let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+            let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+            let (order_base_balance, _) = unsigned_div_rem((order.amount - order.filled) * order.price, denominator);
             let (update_balance_success) = Balances.transfer_from_order(order.owner, market.base_asset, order_base_balance);
             // %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
             with_attr error_message("[Markets] delete > Update balance unsuccessful") {
@@ -691,11 +722,11 @@ namespace Markets {
             let (rev_amounts : felt*) = alloc();
             reverse_array{new_array=rev_prices}(array=prices, idx=length, length=length);
             reverse_array{new_array=rev_amounts}(array=amounts, idx=length, length=length);
-            let (price, base_amount, quote_amount) = fetch_quote_helper(length, rev_prices, rev_amounts, 0, 0, amount);
+            let (price, base_amount, quote_amount) = fetch_quote_helper(length, rev_prices, rev_amounts, 0, 0, amount, market_id);
             return (price=price, base_amount=base_amount, quote_amount=quote_amount);
         } else {
             let (prices, amounts, length) = Limits.view_limit_tree(market.bid_tree_id);
-            let (price, base_amount, quote_amount) = fetch_quote_helper(length, prices, amounts, 0, 0, amount);
+            let (price, base_amount, quote_amount) = fetch_quote_helper(length, prices, amounts, 0, 0, amount, market_id);
             return (price=price, base_amount=base_amount, quote_amount=quote_amount);
         }
     }
@@ -707,13 +738,19 @@ namespace Markets {
     // @param total_quote : cumulative amount filled in terms of quote asset
     // @param total_base : cumulative amount filled in terms of base asset
     // @param amount_rem : remaining unfilled order in terms of quote asset
+    // @param market_id : market ID
     // @return price : quote price
     // @return base_amount : order amount in terms of base asset
     // @return quote_amount : order amount in terms of quote asset
     func fetch_quote_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        idx : felt, prices : felt*, amounts : felt*, total_quote : felt, total_base : felt, amount_rem : felt
+        idx : felt, prices : felt*, amounts : felt*, total_quote : felt, total_base : felt, amount_rem : felt, market_id : felt
     ) -> (price : felt, base_amount : felt, quote_amount : felt) {
         alloc_locals;
+
+        let (storage_addr) = Orders.get_storage_address();
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market_id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market_id);
+        let (units) = pow(10, 18 - base_decimals + quote_decimals);
 
         if ((idx - 0) * (amount_rem - 0) == 0) {
             if ((total_quote - 0) * (total_base - 0) == 0) {
@@ -721,7 +758,9 @@ namespace Markets {
                 return (price=0, base_amount=0, quote_amount=0);
             } else {
                 handle_revoked_refs();
-                let (price, _) = unsigned_div_rem(total_base * 1000000000000000000, total_quote);
+                
+                let (units) = pow(10, 18 - base_decimals + quote_decimals);
+                let (price, _) = unsigned_div_rem(total_base * units, total_quote);
                 // %{ print("price: {}, base_amount: {}, quote_amount: {}".format(ids.price, ids.total_base, ids.total_quote)) %}
                 return (price=price, base_amount=total_base, quote_amount=total_quote);
             }
@@ -735,11 +774,11 @@ namespace Markets {
 
         if (is_partial_order == 1) {
             handle_revoked_refs();
-            let (new_base, _) = unsigned_div_rem(price * amount_rem, 1000000000000000000);
+            let (new_base, _) = unsigned_div_rem(price * amount_rem, units);
             return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount_rem, total_base + new_base, 0);
         } else {
             handle_revoked_refs();
-            let (new_base, _) = unsigned_div_rem(price * amount, 1000000000000000000);
+            let (new_base, _) = unsigned_div_rem(price * amount, units);
             return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount, total_base + new_base, amount_rem - amount);
         }
     }

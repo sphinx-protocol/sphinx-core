@@ -100,6 +100,7 @@ namespace Balances {
         let is_sufficient = is_le(amount, balance);
         let is_positive = is_le(1, amount);
         if (is_sufficient + is_positive == 2) {
+            handle_revoked_refs();
             let (locked_balance) = get_balance(user, asset, 0);
             set_balance(user, asset, 1, balance - amount);
             set_balance(user, asset, 0, locked_balance + amount);
@@ -107,6 +108,7 @@ namespace Balances {
             let (user_locked_balance) = get_balance(user, asset, 0);        
             return (success=1);
         } else {
+            handle_revoked_refs();
             return (success=0);
         }   
     }

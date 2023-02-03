@@ -11,7 +11,7 @@ namespace IGatewayContract {
     func set_addresses(_l2_eth_remote_core_addr : felt, _l2_eth_remote_eip_712_addr : felt) {
     }
     // Create a new market for exchanging between two assets.
-    func create_market(base_asset : felt, quote_asset : felt) {
+    func create_market(base_asset : felt, quote_asset : felt, base_decimals : felt, quote_decimals : felt) {
     }
     // Submit a new bid (limit buy order) to a given market.
     func create_bid(base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt) {
@@ -109,6 +109,10 @@ func test_gateway{
     const buyer = 123456789;
     const seller = 666666666;
 
+    // Set params
+    const base_decimals = 18;
+    const quote_decimals = 18;
+
     // Deploy contracts
     local l2_eth_remote_core_addr : felt;
     local l2_eth_remote_eip_712_addr : felt;
@@ -118,8 +122,8 @@ func test_gateway{
     local storage_addr : felt;
     %{ ids.l2_eth_remote_core_addr = deploy_contract("./src/crosschain/l2_eth_remote_core.cairo", [ids.owner]).contract_address %}
     %{ ids.l2_eth_remote_eip_712_addr = deploy_contract("./src/crosschain/l2_eth_remote_eip_712.cairo", [ids.owner]).contract_address %}
-    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, 1, 1000000 * 1000000000000000000, 0, ids.buyer]).contract_address %}
-    %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, 2, 1000000 * 1000000000000000000, 0, ids.seller]).contract_address %}
+    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, ids.base_decimals, 1000000 * 1000000000000000000, 0, ids.buyer]).contract_address %}
+    %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, ids.quote_decimals, 1000000 * 1000000000000000000, 0, ids.seller]).contract_address %}
     %{ ids.storage_addr = deploy_contract("./src/dex/storage.cairo", [ids.owner]).contract_address %}
     %{ ids.gateway_addr = deploy_contract("./src/dex/gateway.cairo", [ids.owner, ids.storage_addr]).contract_address %}
 
@@ -131,7 +135,7 @@ func test_gateway{
     // Set contract addresses and create new market
     %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.gateway_addr) %}
     IGatewayContract.set_addresses(gateway_addr, l2_eth_remote_core_addr, l2_eth_remote_eip_712_addr);
-    IGatewayContract.create_market(gateway_addr, base_asset, quote_asset);
+    IGatewayContract.create_market(gateway_addr, base_asset, quote_asset, base_decimals, quote_decimals);
     %{ stop_prank_callable() %}
 
     // Fund user balances (deposit)
