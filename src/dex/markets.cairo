@@ -241,7 +241,6 @@ namespace Markets {
 
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         let balance_sufficient = is_le(base_amount, account_balance);
-        %{ print("base_amount: {}, account_balance: {}".format(ids.base_amount, ids.account_balance))  %}
         if (balance_sufficient == 0) {
             handle_revoked_refs();
             return (success=0);
@@ -664,7 +663,6 @@ namespace Markets {
             }
             let (order_base_balance, _) = unsigned_div_rem((order.amount - order.filled) * order.price, denominator);
             let (update_balance_success) = Balances.transfer_from_order(order.owner, market.base_asset, order_base_balance);
-            %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
             with_attr error_message("[Markets] delete > Update balance unsuccessful") {
                 assert update_balance_success = 1;
             }
