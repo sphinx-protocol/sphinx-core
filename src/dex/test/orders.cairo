@@ -1,3 +1,5 @@
+// This contract is a wrapper on the StarkNet DEX Orders contract to allow unit testing.
+
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
@@ -34,7 +36,13 @@ func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (lim
 }
 
 @external
-func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
-    let (success) = Orders.remove(order_id);
-    return (success=success);
+func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (del : Order) {
+    let (del) = Orders.pop(limit_id);
+    return (del=del);
+}
+
+@external
+func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (del : Order) {
+    let (del) = Orders.remove(order_id);
+    return (del=del);
 }

@@ -137,6 +137,7 @@ namespace Orders {
                 limit_id=new_head.limit_id
             );
             IStorageContract.set_order(storage_addr, new_head.order_id, [new_head_updated]);
+            IStorageContract.set_head(storage_addr, limit_id, new_head.order_id);
             handle_revoked_refs();
         }
 
@@ -172,7 +173,6 @@ namespace Orders {
             handle_revoked_refs();
         } else {
             let (limit) = IStorageContract.get_limit(storage_addr, old_tail.limit_id);
-            let (head) = IStorageContract.get_order(storage_addr, limit.head_id);
             let (prev_id) = locate_previous_item(head, [empty_order], old_tail.order_id);
             let (new_tail) = IStorageContract.get_order(storage_addr, prev_id);
             tempvar new_tail_updated: Order* = new Order(
@@ -191,41 +191,6 @@ namespace Orders {
         // print_order_list(head_id, length - 1, 1);
 
         return (del=old_tail);
-    }
-
-    // Locate previous item in linked list.
-    // @dev If item is not found, returns 0
-    // @param curr : order in current iteration of the list
-    // @param prev : previous order in current iteration of the list
-    // @param order_id : target order ID
-    // @return prev_id : ID of previous order in list
-    func locate_previous_item{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        curr : Order, prev : Order, order_id : felt
-    ) -> (prev_id : felt) {
-        if (curr.order_id == order_id) {
-            return (prev_id=prev.order_id);
-        }
-        if (curr.next_id == 0) {
-            return (prev_id=0);
-        }
-        let (storage_addr) = l2_storage_contract_address.read();
-        let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
-        return locate_previous_item(next, curr, order_id);
-    }
-
-    // Iterate through list to find item from head element.
-    // @param i : current iteration
-    // @param idx : list position to be found
-    // @param curr : order in current iteration of the list
-    func locate_item_from_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        i : felt, idx : felt, curr : Order
-    ) -> (order : Order) {
-        if (i == idx) {
-            return (order=curr);
-        }
-        let (storage_addr) = l2_storage_contract_address.read();
-        let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
-        return locate_item_from_head(i + 1, idx, next);
     }
 
 
@@ -257,8 +222,8 @@ namespace Orders {
 
     // Remove order by ID.
     // @param order_id : ID of order being amended
-    // @return success : 1 if successful, 0 otherwise
-    func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (success : felt) {
+    // @return del : deleted order (or empty order if order does not exist)
+    func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (del : Order) {
         alloc_locals;
         
         let (storage_addr) = l2_storage_contract_address.read();
@@ -266,23 +231,21 @@ namespace Orders {
         let empty_order : Order* = gen_empty_order();
         let is_valid = is_le(1, order_id); 
         if (is_valid == 0) {
-            return (success=0);
+            return (del=[empty_order]);
         }
         
         if (removed.next_id == 0) {
-            pop(removed.limit_id);
-            return (success=1);
+            let (del) = pop(removed.limit_id);
+            return (del=del);
         }
 
-        let (limit) = IStorageContract.get_limit(storage_addr, removed.limit_id);
-        let (head) = IStorageContract.get_order(storage_addr, limit.head_id);
-        if (head.order_id == order_id) {
-            shift(removed.limit_id);
-            return (success=1);
+        let (head_id) = IStorageContract.get_head(storage_addr, removed.limit_id);
+        if (head_id == order_id) {
+            let (del) = shift(removed.limit_id);
+            return (del=del);
         }
 
-        let (limit) = IStorageContract.get_limit(storage_addr, removed.limit_id);
-        let (head) = IStorageContract.get_order(storage_addr, limit.head_id);
+        let (head) = IStorageContract.get_order(storage_addr, head_id);
         let (prev_id) = locate_previous_item(head, [empty_order], order_id);
         let (removed_prev) = IStorageContract.get_order(storage_addr, prev_id);
         tempvar updated_removed_prev: Order* = new Order(
@@ -301,28 +264,58 @@ namespace Orders {
         let (length) = IStorageContract.get_length(storage_addr, removed.limit_id);
         IStorageContract.set_length(storage_addr, removed.limit_id, length - 1);
 
-        // Diagnostics
-        // %{ print("Removed order") %}
-        // let (head_id) = IStorageContract.get_head(storage_addr, removed.limit_id);
-        // print_order_list(head_id, length + 1, 1);
-
-        return (success=1);
+        return (del=removed);
     }
 
     // Get order by index.
-    func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt, idx : felt) -> (order : Order) {
-        alloc_locals;
+    // func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt, idx : felt) -> (order : Order) {
+    //     alloc_locals;
         
-        let (storage_addr) = l2_storage_contract_address.read();
-        let empty_order : Order* = gen_empty_order();
-        let (in_range) = validate_idx(limit_id, idx);
-        if (in_range == 0) {
-            return (order=[empty_order]);
+    //     let (storage_addr) = l2_storage_contract_address.read();
+    //     let empty_order : Order* = gen_empty_order();
+    //     let (in_range) = validate_idx(limit_id, idx);
+    //     if (in_range == 0) {
+    //         return (order=[empty_order]);
+    //     }
+    //     let (head_id) = IStorageContract.get_head(storage_addr, limit_id);
+    //     let (head) = IStorageContract.get_order(storage_addr, head_id);
+    //     let (order) = locate_item_from_head(i=0, idx=idx, curr=head);
+    //     return (order=order);
+    // }
+
+    // Utility function to locate previous item in linked list.
+    // @dev If item is not found, returns 0
+    // @param curr : order in current iteration of the list
+    // @param prev : previous order in current iteration of the list
+    // @param order_id : target order ID
+    // @return prev_id : ID of previous order in list
+    func locate_previous_item{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        curr : Order, prev : Order, order_id : felt
+    ) -> (prev_id : felt) {
+        if (curr.order_id == order_id) {
+            return (prev_id=prev.order_id);
         }
-        let (head_id) = IStorageContract.get_head(storage_addr, limit_id);
-        let (head) = IStorageContract.get_order(storage_addr, head_id);
-        let (order) = locate_item_from_head(i=0, idx=idx, curr=head);
-        return (order=order);
+        if (curr.next_id == 0) {
+            return (prev_id=0);
+        }
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
+        return locate_previous_item(next, curr, order_id);
+    }
+
+    // Utility function to iterate through list to find item from head element.
+    // @param i : current iteration
+    // @param idx : list position to be found
+    // @param curr : order in current iteration of the list
+    func locate_item_from_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        i : felt, idx : felt, curr : Order
+    ) -> (order : Order) {
+        if (i == idx) {
+            return (order=curr);
+        }
+        let (storage_addr) = l2_storage_contract_address.read();
+        let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
+        return locate_item_from_head(i + 1, idx, next);
     }
 
     // Utility function to check idx is not out of bounds.

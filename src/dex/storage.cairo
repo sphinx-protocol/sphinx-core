@@ -21,15 +21,15 @@ func owner() -> (addr : felt) {
 
 // Stores orders in doubly linked lists.
 @storage_var
-func orders(id : felt) -> (order : Order) {
+func orders(order_id : felt) -> (order : Order) {
 }
 // Stores heads of doubly linked lists.
 @storage_var
-func heads(limit_id : felt) -> (id : felt) {
+func heads(limit_id : felt) -> (order_id : felt) {
 }
 // Stores tails of doubly linked lists.
 @storage_var
-func tails(limit_id : felt) -> (id : felt) {
+func tails(limit_id : felt) -> (order_id : felt) {
 }
 // Stores lengths of doubly linked lists.
 @storage_var
@@ -37,16 +37,16 @@ func lengths(limit_id : felt) -> (len : felt) {
 }
 // Stores latest order id.
 @storage_var
-func curr_order_id() -> (id : felt) {
+func curr_order_id() -> (order_id : felt) {
 }
 
 // Stores details of limit prices as mapping.
 @storage_var
-func limits(id : felt) -> (limit : Limit) {
+func limits(limit_id : felt) -> (limit : Limit) {
 }
 // Stores roots of binary search trees.
 @storage_var
-func roots(tree_id : felt) -> (id : felt) {
+func roots(tree_id : felt) -> (limit_id : felt) {
 }
 // Stores latest limit id.
 @storage_var
@@ -55,7 +55,7 @@ func curr_limit_id() -> (id : felt) {
 
 // Stores active markets.
 @storage_var
-func markets(id : felt) -> (market : Market) {
+func markets(market_id : felt) -> (market : Market) {
 }
 // Stores on-chain mapping of asset addresses to market id.
 @storage_var
@@ -63,15 +63,15 @@ func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
 }
 // Stores pointers to bid and ask limit trees.
 @storage_var
-func trees(id : felt) -> (root_id : felt) {
+func trees(tree_id : felt) -> (root_limit_id : felt) {
 }
 // Stores latest market id.
 @storage_var
-func curr_market_id() -> (id : felt) {
+func curr_market_id() -> (market_id : felt) {
 }
 // Stores latest tree id.
 @storage_var
-func curr_tree_id() -> (id : felt) {
+func curr_tree_id() -> (tree_id : felt) {
 }
 
 // Stores user balances.
@@ -156,35 +156,35 @@ func set_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 
 @view
 func get_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt) -> (id : felt
+    limit_id : felt) -> (order_id : felt
 ) {
-    let (id) = heads.read(limit_id);
-    return (id=id);
+    let (order_id) = heads.read(limit_id);
+    return (order_id=order_id);
 }
 
 @external
 func set_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, new_id : felt
+    limit_id : felt, new_order_id : felt
 ) {
     assert_only_gateway();
-    heads.write(limit_id, new_id);
+    heads.write(limit_id, new_order_id);
     return ();
 }
 
 @view
 func get_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt) -> (id : felt
+    limit_id : felt) -> (order_id : felt
 ) {
-    let (id) = tails.read(limit_id);
-    return (id=id);
+    let (order_id) = tails.read(limit_id);
+    return (order_id=order_id);
 }
 
 @external
 func set_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, new_id : felt
+    limit_id : felt, new_order_id : felt
 ) {
     assert_only_gateway();
-    tails.write(limit_id, new_id);
+    tails.write(limit_id, new_order_id);
     return ();
 }
 
@@ -207,17 +207,17 @@ func set_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 
 @view
 func get_curr_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-) -> (id : felt) {
-    let (id) = curr_order_id.read();
-    return (id=id);
+) -> (order_id : felt) {
+    let (order_id) = curr_order_id.read();
+    return (order_id=order_id);
 }
 
 @external
 func set_curr_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    new_id : felt
+    new_order_id : felt
 ) {
     assert_only_gateway();
-    curr_order_id.write(new_id);
+    curr_order_id.write(new_order_id);
     return ();
 }
 
@@ -240,34 +240,34 @@ func set_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 
 @view
 func get_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt) -> (id : felt
+    tree_id : felt) -> (limit_id : felt
 ) {
-    let (id) = roots.read(tree_id);
-    return (id=id);
+    let (limit_id) = roots.read(tree_id);
+    return (limit_id=limit_id);
 }
 
 @external
 func set_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt, new_id : felt
+    tree_id : felt, new_limit_id : felt
 ) {
     assert_only_gateway();
-    roots.write(tree_id, new_id);
+    roots.write(tree_id, new_limit_id);
     return ();
 }
 
 @view
 func get_curr_limit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-) -> (id : felt) {
-    let (id) = curr_limit_id.read();
-    return (id=id);
+) -> (limit_id : felt) {
+    let (limit_id) = curr_limit_id.read();
+    return (limit_id=limit_id);
 }
 
 @external
 func set_curr_limit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    new_id : felt
+    new_limit_id : felt
 ) {
     assert_only_gateway();
-    curr_limit_id.write(new_id);
+    curr_limit_id.write(new_limit_id);
     return ();
 }
 
@@ -307,18 +307,18 @@ func set_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 @view
 func get_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt) -> (root_id : felt
+    tree_id : felt) -> (root_limit_id : felt
 ) {
-    let (root_id) = trees.read(tree_id);
-    return (root_id=root_id);
+    let (root_limit_id) = trees.read(tree_id);
+    return (root_limit_id=root_limit_id);
 }
 
 @external
 func set_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    root_id : felt, new_root_id : felt
+    tree_id : felt, new_root_limit_id : felt
 ) {
     assert_only_gateway();
-    trees.write(root_id, new_root_id);
+    trees.write(tree_id, new_root_limit_id);
     return ();
 }
 
