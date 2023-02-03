@@ -110,7 +110,7 @@ func test_gateway{
     const seller = 666666666;
 
     // Set params
-    const base_decimals = 18;
+    const base_decimals = 6;
     const quote_decimals = 18;
 
     // Deploy contracts
@@ -122,7 +122,7 @@ func test_gateway{
     local storage_addr : felt;
     %{ ids.l2_eth_remote_core_addr = deploy_contract("./src/crosschain/l2_eth_remote_core.cairo", [ids.owner]).contract_address %}
     %{ ids.l2_eth_remote_eip_712_addr = deploy_contract("./src/crosschain/l2_eth_remote_eip_712.cairo", [ids.owner]).contract_address %}
-    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, ids.base_decimals, 1000000 * 1000000000000000000, 0, ids.buyer]).contract_address %}
+    %{ ids.base_asset = deploy_contract("./src/ERC20/ERC20.cairo", [1, 1, ids.base_decimals, 1000000 * 1000000, 0, ids.buyer]).contract_address %}
     %{ ids.quote_asset = deploy_contract("./src/ERC20/ERC20.cairo", [2, 2, ids.quote_decimals, 1000000 * 1000000000000000000, 0, ids.seller]).contract_address %}
     %{ ids.storage_addr = deploy_contract("./src/dex/storage.cairo", [ids.owner]).contract_address %}
     %{ ids.gateway_addr = deploy_contract("./src/dex/gateway.cairo", [ids.owner, ids.storage_addr]).contract_address %}
@@ -140,15 +140,15 @@ func test_gateway{
 
     // Fund user balances (deposit)
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.base_asset) %}
-    let (amount_u256) = MathUtils.felt_to_uint256(10000 * 1000000000000000000);
-    IERC20.approve(base_asset, gateway_addr, amount_u256);
+    let (base_amount_u256) = MathUtils.felt_to_uint256(10000 * 1000000);
+    IERC20.approve(base_asset, gateway_addr, base_amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.quote_asset) %}
-    let (amount_u256) = MathUtils.felt_to_uint256(10000 * 1000000000000000000);
-    IERC20.approve(quote_asset, gateway_addr, amount_u256);
+    let (quote_amount_u256) = MathUtils.felt_to_uint256(10000 * 1000000000000000000);
+    IERC20.approve(quote_asset, gateway_addr, quote_amount_u256);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.buyer, target_contract_address=ids.gateway_addr) %}
-    IGatewayContract.deposit(gateway_addr, base_asset, 10000 * 1000000000000000000);
+    IGatewayContract.deposit(gateway_addr, base_asset, 10000 * 1000000);
     %{ stop_prank_callable() %}
     %{ stop_prank_callable = start_prank(ids.seller, target_contract_address=ids.gateway_addr) %}
     IGatewayContract.deposit(gateway_addr, quote_asset, 10000 * 1000000000000000000);

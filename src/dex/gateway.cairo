@@ -115,12 +115,14 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
 // @dev Can only be called by contract owner
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
+// @param base_decimals : decimals for base asset
+// @param quote_decimals : decimals for quote asset
 @external
 func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt
+    base_asset : felt, quote_asset : felt, base_decimals : felt, quote_decimals : felt
 ) {
     Ownable.assert_only_owner();
-    Markets.create_market(base_asset, quote_asset);
+    Markets.create_market(base_asset, quote_asset, base_decimals, quote_decimals);
     return ();
 }
 

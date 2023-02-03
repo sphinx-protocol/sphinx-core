@@ -182,7 +182,9 @@ namespace Markets {
                 if (post_only == 0) {
                     handle_revoked_refs();
                     let (buy_order_success) = buy(caller, market.id, price, 0, amount);
-                    assert buy_order_success = 1;
+                    with_attr error_message("[Markets] create_bid > Failed to create market buy order") {
+                        assert buy_order_success = 1;
+                    }
                     return (success=1);
                 } else {
                     handle_revoked_refs();
@@ -200,14 +202,20 @@ namespace Markets {
             handle_revoked_refs();
             let (new_limit) = Limits.insert(price, market.bid_tree_id, market.id);
             let create_limit_success = is_le(1, new_limit.id);
-            assert create_limit_success = 1;
+            with_attr error_message("[Markets] create_bid > Failed to create limit price") {
+                assert create_limit_success = 1;
+            }
             let (create_bid_success) = create_bid_helper(caller, market, new_limit, price, amount, post_only);
-            assert create_bid_success = 1;
+            with_attr error_message("[Markets] create_bid > Failed to create new bid") {
+                assert create_bid_success = 1;
+            }
         } else {
             // Add order to limit tree
             handle_revoked_refs();
             let (create_bid_success) = create_bid_helper(caller, market, limit, price, amount, post_only);
-            assert create_bid_success = 1;
+            with_attr error_message("[Markets] create_bid > Failed to create new bid") {
+                assert create_bid_success = 1;
+            }
         }
         
         return (success=1);
@@ -226,8 +234,14 @@ namespace Markets {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+        let (base_amount, _) = unsigned_div_rem(amount * price, denominator);
+
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
-        let balance_sufficient = is_le(amount, account_balance);
+        let balance_sufficient = is_le(base_amount, account_balance);
+        %{ print("base_amount: {}, account_balance: {}".format(ids.base_amount, ids.account_balance))  %}
         if (balance_sufficient == 0) {
             handle_revoked_refs();
             return (success=0);
@@ -239,7 +253,9 @@ namespace Markets {
         let (new_order) = Orders.push(1, price, amount, dt, caller, limit.id);
         let (new_head, new_tail) = Orders.get_head_and_tail(limit.id);
         let (update_limit_success) = Limits.update(limit.id, limit.total_vol + amount, limit.length + 1, new_head, new_tail);
-        assert update_limit_success = 1;
+        with_attr error_message("[Markets] create_bid_helper > Failed to update limit price") {
+            assert update_limit_success = 1;
+        }
 
         let (highest_bid) = Orders.get_order(market.highest_bid);
         let highest_bid_exists = is_le(1, highest_bid.id); 
@@ -248,15 +264,17 @@ namespace Markets {
             handle_revoked_refs();
         } else {
             let (update_market_success) = update_inside_quote(market.id, market.lowest_ask, new_order.id);
-            assert update_market_success = 1;
+            with_attr error_message("[Markets] create_bid_helper > Failed to update market") {
+                assert update_market_success = 1;
+            }
             handle_revoked_refs();
         }
-        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
-        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+
         let (order_size_in_base, _) = unsigned_div_rem(amount * price, denominator);
         let (update_balance_success) = Balances.transfer_to_order(caller, market.base_asset, order_size_in_base);
-        assert update_balance_success = 1;
+        with_attr error_message("[Markets] create_bid_helper > Failed to update user balance") {
+            assert update_balance_success = 1;
+        }
 
         log_create_bid.emit(
             id=new_order.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=price, 
@@ -365,8 +383,6 @@ namespace Markets {
             assert update_market_success = 1;
             handle_revoked_refs();
         }
-        let (denominator) = pow(10, 18);
-        let (order_size_in_quote, _) = unsigned_div_rem(amount * price, denominator);
         let (update_balance_success) = Balances.transfer_to_order(caller, market.quote_asset, amount);
         assert update_balance_success = 1;
 
@@ -606,6 +622,10 @@ namespace Markets {
         let (market) = IStorageContract.get_market(storage_addr, limit.market_id);
         let (new_head_id, new_tail_id) = Orders.get_head_and_tail(order.limit_id);
 
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
+
         // %{ print("order.is_buy: {}".format(ids.order.is_buy)) %}
         if (order.is_buy == 1) {
             // %{ print("limit.length: {}".format(ids.limit.length)) %}
@@ -642,12 +662,9 @@ namespace Markets {
                 }
                 handle_revoked_refs();     
             }
-            let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-            let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
-            let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
             let (order_base_balance, _) = unsigned_div_rem((order.amount - order.filled) * order.price, denominator);
             let (update_balance_success) = Balances.transfer_from_order(order.owner, market.base_asset, order_base_balance);
-            // %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
+            %{ print("update_balance_success: {}".format(ids.update_balance_success)) %}
             with_attr error_message("[Markets] delete > Update balance unsuccessful") {
                 assert update_balance_success = 1;
             }
@@ -775,11 +792,11 @@ namespace Markets {
         if (is_partial_order == 1) {
             handle_revoked_refs();
             let (new_base, _) = unsigned_div_rem(price * amount_rem, units);
-            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount_rem, total_base + new_base, 0);
+            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount_rem, total_base + new_base, 0, market_id);
         } else {
             handle_revoked_refs();
             let (new_base, _) = unsigned_div_rem(price * amount, units);
-            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount, total_base + new_base, amount_rem - amount);
+            return fetch_quote_helper(idx - 1, prices, amounts, total_quote + amount, total_base + new_base, amount_rem - amount, market_id);
         }
     }
 
