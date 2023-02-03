@@ -2,21 +2,20 @@
 
 // Data structure representing an order.
 struct Order {
-    id : felt,
+    order_id : felt,
     next_id : felt,
-    prev_id : felt,
     is_buy : felt, // 1 = buy, 0 = sell
     price : felt,
     amount : felt,
     filled : felt,
-    dt : felt,
+    datetime : felt,
     owner : felt,
     limit_id : felt,
 }
 
 // Data structure representing a limit price.
 struct Limit {
-    id : felt,
+    limit_id : felt,
     left_id : felt,
     right_id : felt,
     price : felt,
@@ -30,7 +29,7 @@ struct Limit {
 
 // Data structure representing a market.
 struct Market {
-    id : felt,
+    market_id : felt,
     bid_tree_id : felt,
     ask_tree_id : felt,
     lowest_ask : felt,

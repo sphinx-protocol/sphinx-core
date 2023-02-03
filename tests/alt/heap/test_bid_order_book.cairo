@@ -14,25 +14,25 @@ func test_bid_order_book{
     alloc_locals;
 
     // Insert values to heap
-    bob_insert(order_price=78, order_dt=9952, order_id=3693265); 
-    bob_insert(order_price=95, order_dt=9956, order_id=19075640); 
-    bob_insert(order_price=95, order_dt=8000, order_id=466); 
-    bob_insert(order_price=48, order_dt=8870, order_id=9544525); 
-    bob_insert(order_price=96, order_dt=9955, order_id=98374127); 
-    bob_insert(order_price=96, order_dt=9952, order_id=7547619); 
-    bob_insert(order_price=48, order_dt=8278, order_id=35533); 
-    bob_insert(order_price=48, order_dt=8870, order_id=25011021); 
+    bob_insert(order_price=78, order_datetime=9952, order_id=3693265); 
+    bob_insert(order_price=95, order_datetime=9956, order_id=19075640); 
+    bob_insert(order_price=95, order_datetime=8000, order_id=466); 
+    bob_insert(order_price=48, order_datetime=8870, order_id=9544525); 
+    bob_insert(order_price=96, order_datetime=9955, order_id=98374127); 
+    bob_insert(order_price=96, order_datetime=9952, order_id=7547619); 
+    bob_insert(order_price=48, order_datetime=8278, order_id=35533); 
+    bob_insert(order_price=48, order_datetime=8870, order_id=25011021); 
 
     // Test insertion has been done correctly
     let (elem1) = bid_order_book.read(idx=0);
     assert elem1.price = 96;
-    assert elem1.dt = 9952;
+    assert elem1.datetime = 9952;
     let (elem2) = bid_order_book.read(idx=1);
     assert elem2.price = 95;
-    assert elem2.dt = 8000;
+    assert elem2.datetime = 8000;
     let (elem3) = bid_order_book.read(idx=2);
     assert elem3.price = 96;
-    assert elem3.dt = 9955;
+    assert elem3.datetime = 9955;
     let (elem4) = bid_order_book.read(idx=3);
     assert elem4.price = 48;
     let (elem5) = bid_order_book.read(idx=4);
@@ -45,22 +45,22 @@ func test_bid_order_book{
     assert elem8.price = 48;
 
     // Delete root value
-    let (root_price, root_dt, root_id) = bob_extract_max();
+    let (root_price, root_datetime, root_id) = bob_extract_max();
 
     // Check sink down executed correctly
     assert root_price = 96;
-    assert root_dt = 9952;
+    assert root_datetime = 9952;
     assert root_id = 7547619;
 
     let (updated_elem1) = bid_order_book.read(idx=0);
     assert updated_elem1.price = 96;
-    assert updated_elem1.dt = 9955;
+    assert updated_elem1.datetime = 9955;
     let (updated_elem3) = bid_order_book.read(idx=2);
     assert updated_elem3.price = 95;
-    assert updated_elem3.dt = 9956;
+    assert updated_elem3.datetime = 9956;
     let (updated_elem6) = bid_order_book.read(idx=5);
     assert updated_elem6.price = 48;
-    assert updated_elem6.dt = 8870;
+    assert updated_elem6.datetime = 8870;
 
     return ();
 }

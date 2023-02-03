@@ -24,7 +24,7 @@ func print_order_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     let (order) = orders.read(node_loc);
     %{
         print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, datetime: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.datetime, ids.order.owner, ids.order.limit_id))
     %}
     return print_order_list(order.next_id, idx - 1, 0);
 }
@@ -34,7 +34,7 @@ func print_order_list{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func print_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order : Order) {
     %{
         print("    ", end="")
-        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, dt: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.dt, ids.order.owner, ids.order.limit_id))
+        print("id: {}, next_id: {}, prev_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, datetime: {}, owner: {}, limit_id: {}".format(ids.order.id, ids.order.next_id, ids.order.prev_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.datetime, ids.order.owner, ids.order.limit_id))
     %}
     return ();
 }

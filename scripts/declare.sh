@@ -26,7 +26,7 @@ starknet declare --contract build/storage.json
 
 # Starknet Goerli:
 # Storage Contract class hash: 0x71b704ea7ceaa479b77c6d87a4b9fd6c84513d6130032d3bac03749ecc9fe2a
-# Gateway Contract class hash: 0x798cba82d984fed80b5c906c8cc9ea1fc658b4225303ea614cfc3b2c7b9045b
+# Gateway Contract class hash: 0x75c056e70ff4bf375b5d364fca3eac7691ac6d6c53026d3e06e6f9f62b0c8e0
 
 # Deploy contract by interacting with UDC: 0x041a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf
 # Link: https://testnet-2.starkscan.co/contract/0x041a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf#write-contract
@@ -40,7 +40,8 @@ starknet declare --contract build/storage.json
     # calldata_len: 1
     # calldata: 3112176067681992360311991245839735412592422540530926815428076220147821108624
 
-    # Deployed contract address: 0x050b81a68a60f485d91eb4e5f3ad1bfa813d4c0451ff7a31581225ae5b77ee7d
+    # Deployed contract address (Goerli2): 0x050b81a68a60f485d91eb4e5f3ad1bfa813d4c0451ff7a31581225ae5b77ee7d
+    # Deployed contract address (Goerli): 0x053085df8e1af64be60c8ac217a740629102d8f520be739461377d6e2220972c
 
 # Gateway Contract:
     # classHash: 0x798cba82d984fed80b5c906c8cc9ea1fc658b4225303ea614cfc3b2c7b9045b
@@ -49,7 +50,8 @@ starknet declare --contract build/storage.json
     # calldata_len: 2
     # calldata: 3112176067681992360311991245839735412592422540530926815428076220147821108624, 2281894375831758191924518410165984933230241576817723760171721568148786769533
 
-    # Deployed contract address: 0x024a2811e0a5192ef00b89c2488541b3223d25eb483e5cedd612fd16a495f549
+    # Deployed contract address (Goerli2): 0x024a2811e0a5192ef00b89c2488541b3223d25eb483e5cedd612fd16a495f549
+    # Deployed contract address: 0x017c254cb2a3652455984e3da0ad97b377d80b62c4b87402c5b50c0f7bdd72f0
 
 # L2EthRemoteCore Contract:
     # classHash: 0x5bfac950a390abd457bd28347e072b5876dd967950fda4c23d161ccb4466815

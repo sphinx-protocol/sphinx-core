@@ -379,8 +379,8 @@ func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_pt
     let (caller) = get_caller_address();
     let (order) = Orders.get_order(order_id);
     if (caller == order.owner) {
-        let (order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(order_id);
-        log_delete_order.emit(order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled);
+        let (order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(order_id);
+        log_delete_order.emit(order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled);
         handle_revoked_refs();
     } else {
         handle_revoked_refs();
@@ -400,8 +400,8 @@ func remote_cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     with_attr error_message("[Gateway] remote_cancel_order > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    let (order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(order_id);
-    log_delete_order.emit(order_id, limit_id, market_id, dt, owner, base_asset, quote_asset, price, amount, filled);
+    let (order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(order_id);
+    log_delete_order.emit(order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled);
     return ();
 }
 

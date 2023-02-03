@@ -135,30 +135,12 @@ func assert_only_gateway{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
     return ();
 }
 
-// Modifier to assert only callable by L2GatewayContract or contract owner
-func assert_gateway_or_owner{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () {
-    let (caller) = get_caller_address();
-    let (gateway_addr) = l2_gateway_contract_address.read();
-    let (owner_addr) = owner.read();
-    if ((caller - gateway_addr) * (caller - owner_addr) == 0) {
-        handle_revoked_refs();
-        return ();
-    } else {
-        handle_revoked_refs();
-        with_attr error_message("[Storage] assert_gateway_or_owner > Only callable by GatewayContract or owner") {
-            assert 1 = 0;
-        }
-        return ();
-    }
-}
-
 // Getters and setters for storage vars
 
 @view
 func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     order_id : felt) -> (order : Order
 ) {
-    assert_gateway_or_owner();
     let (order) = orders.read(order_id);
     return (order=order);
 }
@@ -176,7 +158,6 @@ func set_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 func get_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (id : felt
 ) {
-    assert_gateway_or_owner();
     let (id) = heads.read(limit_id);
     return (id=id);
 }
@@ -194,7 +175,6 @@ func set_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func get_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (id : felt
 ) {
-    assert_gateway_or_owner();
     let (id) = tails.read(limit_id);
     return (id=id);
 }
@@ -212,7 +192,6 @@ func set_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (len : felt
 ) {
-    assert_gateway_or_owner();
     let (len) = lengths.read(limit_id);
     return (len=len);
 }
@@ -229,7 +208,6 @@ func set_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 @view
 func get_curr_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 ) -> (id : felt) {
-    assert_gateway_or_owner();
     let (id) = curr_order_id.read();
     return (id=id);
 }
@@ -247,7 +225,6 @@ func set_curr_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (limit : Limit
 ) {
-    assert_gateway_or_owner();
     let (limit) = limits.read(limit_id);
     return (limit=limit);
 }
@@ -265,7 +242,6 @@ func set_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 func get_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     tree_id : felt) -> (id : felt
 ) {
-    assert_gateway_or_owner();
     let (id) = roots.read(tree_id);
     return (id=id);
 }
@@ -282,7 +258,6 @@ func set_root{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 @view
 func get_curr_limit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 ) -> (id : felt) {
-    assert_gateway_or_owner();
     let (id) = curr_limit_id.read();
     return (id=id);
 }
@@ -300,7 +275,6 @@ func set_curr_limit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt) -> (market : Market
 ) {
-    assert_gateway_or_owner();
     let (market) = markets.read(market_id);
     return (market=market);
 }
@@ -318,7 +292,6 @@ func set_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 func get_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     base_asset : felt, quote_asset : felt) -> (market_id : felt
 ) {
-    assert_gateway_or_owner();
     let (market_id) = market_ids.read(base_asset, quote_asset);
     return (market_id=market_id);
 }
@@ -336,7 +309,6 @@ func set_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 func get_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     tree_id : felt) -> (root_id : felt
 ) {
-    assert_gateway_or_owner();
     let (root_id) = trees.read(tree_id);
     return (root_id=root_id);
 }
@@ -353,7 +325,6 @@ func set_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 @view
 func get_curr_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 ) -> (market_id : felt) {
-    assert_gateway_or_owner();
     let (market_id) = curr_market_id.read();
     return (market_id=market_id);
 }
@@ -370,7 +341,6 @@ func set_curr_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 @view
 func get_curr_tree_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 ) -> (tree_id : felt) {
-    assert_gateway_or_owner();
     let (tree_id) = curr_tree_id.read();
     return (tree_id=tree_id);
 }
@@ -388,7 +358,6 @@ func set_curr_tree_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_account_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     user : felt, asset : felt
 ) -> (amount : felt) {
-    assert_gateway_or_owner();
     let (amount) = account_balances.read(user, asset);
     return (amount=amount);
 }
@@ -406,7 +375,6 @@ func set_account_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 func get_order_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     user : felt, asset : felt
 ) -> (amount : felt) {
-    assert_gateway_or_owner();
     let (amount) = order_balances.read(user, asset);
     return (amount=amount);
 }

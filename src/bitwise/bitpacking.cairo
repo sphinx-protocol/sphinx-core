@@ -7,6 +7,9 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.uint256 import Uint256, uint256_unsigned_div_rem, uint256_and
 
+from src.dex.structs import Order
+
+
 const FULL_SLOT = 2 ** 128;
 const HALF_SLOT = 2 ** 64;
 
@@ -14,36 +17,29 @@ const HALF_SLOT = 2 ** 64;
 // Functions
 //
 
-// Bitpacks Order into two Uint256 structs.
+// Packs Order into two Uint256 structs.
 // @params Order fields
 // @return order_slab0 : slab containing first half of bitpacked Order struct
 // @return order_slab1 : slab containing second half of bitpacked Order struct
 @external
 func pack_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
-    order_id : felt, 
-    next_id : felt, 
-    price : felt, 
-    amount : felt, 
-    filled : felt, 
-    owner_id : felt, 
-    limit_id : felt, 
-    is_buy : felt
+    order : Order
 ) -> (order_slab0 : Uint256, order_slab1 : Uint256) {
     alloc_locals;
     
-    check_size_valid(order_id, 64);
-    check_size_valid(next_id, 64);
-    check_size_valid(price, 64);
-    check_size_valid(amount, 64);
-    check_size_valid(filled, 64);
-    check_size_valid(owner_id, 64);
-    check_size_valid(limit_id, 64);
-    check_size_valid(is_buy, 1);
+    check_size_valid(order.order_id, 64);
+    check_size_valid(order.next_id, 64);
+    check_size_valid(order.price, 64);
+    check_size_valid(order.amount, 64);
+    check_size_valid(order.filled, 64);
+    check_size_valid(order.owner_id, 64);
+    check_size_valid(order.limit_id, 64);
+    check_size_valid(order.is_buy, 1);
 
-    local slab0_high = order_id * HALF_SLOT + next_id;
-    local slab0_low = price * HALF_SLOT + amount;
-    local slab1_high = filled * HALF_SLOT + owner_id;
-    local slab1_low = limit_id * HALF_SLOT + is_buy;
+    local slab0_high = order.order_id * HALF_SLOT + order.next_id;
+    local slab0_low = order.price * HALF_SLOT + order.amount;
+    local slab1_high = order.filled * HALF_SLOT + order.owner_id;
+    local slab1_low = order.limit_id * HALF_SLOT + order.is_buy;
 
     local slab0 : Uint256 = Uint256(slab0_low, slab0_high);
     local slab1 : Uint256 = Uint256(slab1_low, slab1_high);
@@ -63,8 +59,22 @@ func check_size_valid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     return ();
 }
 
+
+// // Unpacks order slabs into order struct.
+// // @params Order fields
+// // @return order_slab0 : slab containing first half of bitpacked Order struct
+// // @return order_slab1 : slab containing second half of bitpacked Order struct
+// @external
+// func unpack_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(
+//     order_slab0 : Uint256, order_slab1 : Uint256
+// ) -> (order : Order) {
+//     alloc_locals;
+    
+
+// }
+
 // Retrieves data from slab given a position and length in bots.
-// @params slab : Uint256 struct containing bitpacked data
+// @params slab : Uint256 struct containing packed data
 // @params pos : position of first bit in slab
 // @params len : length of data in bits
 @external
@@ -106,7 +116,7 @@ func unpack_slab_in_range{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_
 }
 
 // Retrieves order_id from order_slab0.
-// @params order_slab0 : slab containing first half of bitpacked Order struct
+// @params order_slab0 : slab containing first half of packed Order struct
 // @return order_id : order ID
 @external
 func retrieve_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(

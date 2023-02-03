@@ -98,16 +98,16 @@ namespace Limits {
         
         let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         if (root_id == 0) {
-            IStorageContract.set_root(storage_addr, tree_id, new_limit.id);
+            IStorageContract.set_root(storage_addr, tree_id, new_limit.limit_id);
 
             // Diagnostics
-            // let (new_root) = IStorageContract.get_limit(storage_addr, new_limit.id);
+            // let (new_root) = IStorageContract.get_limit(storage_addr, new_limit.limit_id);
             // print_limit_tree(new_root, 1);
 
             return (new_limit=[new_limit]);
         }
         let (root) = IStorageContract.get_limit(storage_addr, root_id);
-        let (inserted) = insert_helper(price, root, new_limit.id, tree_id, market_id);
+        let (inserted) = insert_helper(price, root, new_limit.limit_id, tree_id, market_id);
 
         // Diagnostics
         // let (new_root) = IStorageContract.get_limit(storage_addr, root_id);
@@ -137,10 +137,10 @@ namespace Limits {
         if (greater_than == 1) {
             if (curr.right_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
-                    id=curr.id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
+                    id=curr.limit_id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
                     length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
                 );
-                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
                 let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
@@ -156,10 +156,10 @@ namespace Limits {
         if (less_than == 1) {
             if (curr.left_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
-                    id=curr.id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
+                    id=curr.limit_id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
                     length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
                 );
-                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
                 let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
@@ -208,7 +208,7 @@ namespace Limits {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        if (curr.id == 0) {
+        if (curr.limit_id == 0) {
             let empty_limit: Limit* = gen_empty_limit();
             handle_revoked_refs();
             return (limit=[empty_limit], parent=[empty_limit]);
@@ -258,7 +258,7 @@ namespace Limits {
         }
 
         let (limit, parent) = find(price, tree_id);
-        if (limit.id == 0) {
+        if (limit.limit_id == 0) {
             return (del=[empty_limit]);
         }
 
@@ -278,11 +278,11 @@ namespace Limits {
                 let (right) = IStorageContract.get_limit(storage_addr, limit.right_id);
                 let (successor, successor_parent) = find_min(right, limit);
 
-                update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=successor.id);
-                if (limit.left_id == successor.id) {                
+                update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=successor.limit_id);
+                if (limit.left_id == successor.limit_id) {                
                     update_pointers(successor, 0, limit.right_id);
                 } else {
-                    if (limit.right_id == successor.id) {
+                    if (limit.right_id == successor.limit_id) {
                         update_pointers(successor, limit.left_id, 0);                    
                     } else {
                         update_pointers(successor, limit.left_id, limit.right_id);
@@ -311,14 +311,14 @@ namespace Limits {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        if (parent.id == 0) {
+        if (parent.limit_id == 0) {
             IStorageContract.set_root(storage_addr, tree_id, new_id);
             handle_revoked_refs();
         } else {
             handle_revoked_refs();
         }
 
-        if (parent.left_id == limit.id) {
+        if (parent.left_id == limit.limit_id) {
             update_pointers(parent, new_id, parent.right_id);
         } else {
             update_pointers(parent, parent.left_id, new_id);
@@ -335,11 +335,11 @@ namespace Limits {
         node : Limit, left_id : felt, right_id : felt
     ) {
         tempvar new_node: Limit* = new Limit(
-            id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
+            id=node.limit_id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
             length=node.length, head_id=node.head_id, tail_id=node.tail_id, tree_id=node.tree_id, market_id=node.market_id
         );
         let (storage_addr) = Orders.get_storage_address();
-        IStorageContract.set_limit(storage_addr, node.id, [new_node]);
+        IStorageContract.set_limit(storage_addr, node.limit_id, [new_node]);
         handle_revoked_refs();
         return ();
     }
@@ -385,7 +385,7 @@ namespace Limits {
         let (storage_addr) = Orders.get_storage_address();
         let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
         tempvar new_limit: Limit* = new Limit(
-            id=limit.id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
+            id=limit.limit_id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
             length=length, head_id=head_id, tail_id=tail_id, tree_id=limit.tree_id, market_id=limit.market_id
         );
         IStorageContract.set_limit(storage_addr, limit_id, [new_limit]);
@@ -612,7 +612,7 @@ namespace Limits {
         owners : felt*, 
         ids : felt*
     } (order : Order, idx: felt) -> (new_idx : felt) {
-        if (order.id == 0) {
+        if (order.order_id == 0) {
             handle_revoked_refs_alt_2();
             return (new_idx=idx);
         } else {
@@ -622,7 +622,7 @@ namespace Limits {
         assert prices[idx] = order.price;
         assert amounts[idx] = order.amount;
         assert owners[idx] = order.owner;
-        assert ids[idx] = order.id;
+        assert ids[idx] = order.order_id;
 
         if (order.next_id == 0) {
             handle_revoked_refs_alt_2();
