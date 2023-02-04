@@ -204,10 +204,9 @@ namespace Orders {
     // Update filled amount of order.
     // @param id : order ID
     // @param filled : updated filled amount of order
-    // @return success : 1 if update was successful, 0 otherwise
     func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         id : felt, filled : felt
-    ) -> (success : felt) {
+    ) {
         let (storage_addr) = get_storage_address();
         let (order) = IStorageContract.get_order(storage_addr, id);
         let is_valid = is_le(filled, order.amount);
@@ -220,10 +219,13 @@ namespace Orders {
             );
             IStorageContract.set_order(storage_addr, order.order_id, [new_order]);
             handle_revoked_refs();
-            return (success=1);
+            return ();
         } else {
+            with_attr error_message("Fill amount invalid") {
+                assert 1 = 0;
+            } 
             handle_revoked_refs();
-            return (success=0);
+            return ();
         }    
     }
 
