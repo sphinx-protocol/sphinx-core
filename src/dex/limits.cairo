@@ -48,8 +48,8 @@ namespace Limits {
     // Insert new limit price into BST.
     // @param price : new limit price to be inserted
     // @param tree_id : ID of tree currently being traversed
-    // @param tree_id : ID of current market
-    // @return success : 1 if insertion was successful, 0 otherwise
+    // @param market_id : ID of current market
+    // @return new_limit : new limit price inserted
     func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         price : felt, tree_id : felt, market_id : felt
     ) -> (new_limit : Limit) {
@@ -90,7 +90,7 @@ namespace Limits {
     // @param new_limit_id : id of new node to be inserted into the BST
     // @param tree_id : ID of tree currently being traversed
     // @param market_id : ID of current market
-    // @return success : 1 if insertion was successful, 0 otherwise
+    // @return new_limit : new limit price inserted
     func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt
     ) -> (new_limit : Limit) {
