@@ -30,12 +30,6 @@ namespace IStorageContract {
     // Set market ID by base and quote asset addresses
     func set_market_id(base_asset : felt, quote_asset : felt, new_market_id : felt) {
     }
-    // Get root node of tree based on tree ID
-    func get_tree(tree_id : felt) -> (root_id : felt) {
-    }
-    // Set root node of tree based on tree ID
-    func set_tree(tree_id : felt, new_root_id : felt) {
-    }
     // Get current market ID
     func get_curr_market_id() -> (id : felt) {
     }
@@ -70,7 +64,7 @@ namespace Markets {
     // @param base_asset : felt representation of ERC20 base asset contract address
     // @param quote_asset : felt representation of ERC20 quote asset contract address
     // @return market_id : market iD
-    func get_market_ids{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    func get_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         base_asset : felt, quote_asset : felt) -> (market_id : felt
     ) {
         let (storage_addr) = Orders.get_storage_address();
@@ -84,16 +78,6 @@ namespace Markets {
         }
     }
 
-    // Get market from market ID.
-    // @param market_id : market ID
-    // @return market : retrieved market
-    func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (market_id : felt
-    ) -> (market : Market) {
-        let (storage_addr) = Orders.get_storage_address();
-        let (market) = IStorageContract.get_market(storage_addr, market_id);
-        return (market=market);
-    }
-
     // Create a new market for exchanging between two assets.
     // @param base_asset : felt representation of ERC20 base asset contract address
     // @param quote_asset : felt representation of ERC20 quote asset contract address
@@ -103,14 +87,19 @@ namespace Markets {
         alloc_locals;
         
         let (storage_addr) = Orders.get_storage_address();
-        let (existing_market_id) = get_market_ids(base_asset, quote_asset);
+        let (existing_market_id) = get_market_id(base_asset, quote_asset);
         let market_exists = is_le(1, existing_market_id);
         with_attr error_message("Market already exists") {
             assert market_exists = 0;
         }
+        if (base_asset == quote_asset) {
+            with_attr error_message("Assets cannot be the same") {
+                assert 1 = 0;
+            }
+        }
 
-        let (market_id) = IStorageContract.get_curr_market_id(storage_addr, );
-        let (tree_id) = IStorageContract.get_curr_tree_id(storage_addr, );
+        let (market_id) = IStorageContract.get_curr_market_id(storage_addr);
+        let (tree_id) = IStorageContract.get_curr_tree_id(storage_addr);
 
         tempvar new_market: Market* = new Market(
             market_id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
@@ -157,10 +146,10 @@ namespace Markets {
     // @param caller : caller of contract method, passed in from GatewayContract
     // @param market_id : ID of market
     // @param price : limit price of order
-    // @param amount : order size in number of tokens of quote asset
+    // @param quote_amount : order size in number of tokens of quote asset
     // @param post_only : 1 if create bid in post only mode, 0 otherwise
     func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
+        caller : felt, market_id : felt, price : felt, quote_amount : felt, post_only : felt
     ) {
         alloc_locals;
 
@@ -183,7 +172,7 @@ namespace Markets {
             handle_revoked_refs();
             if (is_market_order == 1) {
                 if (post_only == 0) {
-                    buy(caller, market.market_id, price, 0, amount);
+                    buy(caller, market.market_id, price, 0, quote_amount);
                     handle_revoked_refs();
                     return ();
                 } else {
@@ -202,11 +191,11 @@ namespace Markets {
         if (limit.limit_id == 0) {
             // Limit tree doesn't exist yet, insert new limit tree
             let (new_limit) = Limits.insert(price, market.bid_tree_id, market.market_id);
-            create_bid_helper(caller, market, new_limit, price, amount, post_only);
+            create_bid_helper(caller, market, new_limit, price, quote_amount, post_only);
             handle_revoked_refs();
         } else {
             // Add order to limit tree
-            create_bid_helper(caller, market, limit, price, amount, post_only);
+            create_bid_helper(caller, market, limit, price, quote_amount, post_only);
             handle_revoked_refs();
         }
         return ();
@@ -217,15 +206,15 @@ namespace Markets {
     // @param market : market to which bid is being submitted
     // @param limit : limit tree to which bid is being submitted
     // @param price : limit price of order
-    // @param amount : order size in number of tokens of quote asset
+    // @param quote_amount : order size in number of tokens of quote asset
     func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+        caller : felt, market : Market, limit : Limit, price : felt, quote_amount : felt, post_only : felt
     ) {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
-        let balance_sufficient = is_le(amount, account_balance);
+        let balance_sufficient = is_le(quote_amount, account_balance);
         if (balance_sufficient == 0) {
             handle_revoked_refs();
             with_attr error_message("Balance insufficient") {
@@ -237,9 +226,9 @@ namespace Markets {
         }
 
         let (datetime) = get_block_timestamp();
-        let (new_order) = Orders.push(1, price, amount, datetime, caller, limit.limit_id);
+        let (new_order) = Orders.push(1, price, quote_amount, datetime, caller, limit.limit_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, limit.limit_id);
-        Limits.update(limit.limit_id, limit.total_vol + amount, limit.length + 1);
+        Limits.update(limit.limit_id, limit.total_vol + quote_amount, limit.length + 1);
 
         let (highest_bid) = IStorageContract.get_order(storage_addr, market.highest_bid);
         let highest_bid_exists = is_le(1, highest_bid.order_id); 
@@ -250,12 +239,11 @@ namespace Markets {
             update_inside_quote(market.market_id, market.lowest_ask, new_order.order_id);
             handle_revoked_refs();
         }
-        let (order_size, _) = unsigned_div_rem(amount * price, 1000000000000000000);
+        let (order_size, _) = unsigned_div_rem(quote_amount * price, 1000000000000000000);
         Balances.transfer_to_order(caller, market.base_asset, order_size);
 
         log_create_bid.emit(
-            order_id=new_order.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=price, 
-            amount=amount, post_only=post_only
+            order_id=new_order.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=price, quote_amount=quote_amount, post_only=post_only
         );
 
         return ();
@@ -265,10 +253,10 @@ namespace Markets {
     // @param caller : caller of contract method, passed in from GatewayContract
     // @param market_id : ID of market
     // @param price : limit price of order
-    // @param amount : order size in number of tokens of quote asset
+    // @param quote_amount : order size in number of tokens of quote asset
     // @param post_only : 1 if create bid in post only mode, 0 otherwise
     func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt
+        caller : felt, market_id : felt, price : felt, quote_amount : felt, post_only : felt
     ) {
         alloc_locals;
 
@@ -292,7 +280,7 @@ namespace Markets {
             let is_market_order = is_le(price, highest_bid.price);
             if (is_market_order == 1) {
                 if (post_only == 0) {
-                    sell(caller, market.market_id, price, 0, amount);
+                    sell(caller, market.market_id, price, 0, quote_amount);
                     handle_revoked_refs();
                     return ();
                 } else {
@@ -311,11 +299,11 @@ namespace Markets {
         if (limit.limit_id == 0) {
             // Limit tree doesn't exist yet, insert new limit tree
             let (new_limit) = Limits.insert(price, market.ask_tree_id, market.market_id);
-            create_ask_helper(caller, market, new_limit, price, amount, post_only);
+            create_ask_helper(caller, market, new_limit, price, quote_amount, post_only);
             handle_revoked_refs();
         } else {
             // Add order to limit tree
-            create_ask_helper(caller, market, limit, price, amount, post_only);
+            create_ask_helper(caller, market, limit, price, quote_amount, post_only);
             handle_revoked_refs();
         }
         
@@ -327,15 +315,15 @@ namespace Markets {
     // @param market : market to which bid is being submitted
     // @param limit : limit tree to which bid is being submitted
     // @param price : limit price of order
-    // @param amount : order size in number of tokens of quote asset
+    // @param quote_amount : order size in number of tokens of quote asset
     func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        caller : felt, market : Market, limit : Limit, price : felt, amount : felt, post_only : felt
+        caller : felt, market : Market, limit : Limit, price : felt, quote_amount : felt, post_only : felt
     ) {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
-        let balance_sufficient = is_le(amount, account_balance);
+        let balance_sufficient = is_le(quote_amount, account_balance);
         if (balance_sufficient == 0) {
             handle_revoked_refs();
             with_attr error_message("Balance insufficient") {
@@ -347,9 +335,9 @@ namespace Markets {
         }
 
         let (datetime) = get_block_timestamp();
-        let (new_order) = Orders.push(0, price, amount, datetime, caller, limit.limit_id);
+        let (new_order) = Orders.push(0, price, quote_amount, datetime, caller, limit.limit_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, limit.limit_id);
-        Limits.update(limit.limit_id, limit.total_vol + amount, limit.length + 1);
+        Limits.update(limit.limit_id, limit.total_vol + quote_amount, limit.length + 1);
 
         let (lowest_ask) = IStorageContract.get_order(storage_addr, market.lowest_ask);
         let lowest_ask_exists = is_le(1, lowest_ask.order_id); 
@@ -360,11 +348,11 @@ namespace Markets {
             update_inside_quote(market.market_id, new_order.order_id, market.highest_bid);
             handle_revoked_refs();
         }
-        Balances.transfer_to_order(caller, market.quote_asset, amount);
+        Balances.transfer_to_order(caller, market.quote_asset, quote_amount);
 
         log_create_ask.emit(
             order_id=new_order.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=price, 
-            amount=amount, post_only=post_only
+            quote_amount=quote_amount, post_only=post_only
         );
 
         return ();
@@ -426,8 +414,8 @@ namespace Markets {
             Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, quote_amount);
             Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
             
-            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=quote_amount, total_filled=lowest_ask.filled+quote_amount);
-            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=quote_amount, total_filled=filled+quote_amount);
+            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=quote_amount, total_filled=lowest_ask.filled+quote_amount);
+            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=quote_amount, total_filled=filled+quote_amount);
             handle_revoked_refs();
             return ();
         } else {
@@ -437,8 +425,8 @@ namespace Markets {
             Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, lowest_ask.amount - lowest_ask.filled);
 
-            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount, total_filled=lowest_ask.amount);
-            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, amount=lowest_ask.amount-lowest_ask.filled, total_filled=filled+lowest_ask.amount-lowest_ask.filled);
+            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=lowest_ask.amount, total_filled=lowest_ask.amount);
+            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=lowest_ask.amount-lowest_ask.filled, total_filled=filled+lowest_ask.amount-lowest_ask.filled);
 
             buy(caller, market_id, max_price, filled + lowest_ask.amount - lowest_ask.filled, quote_amount - lowest_ask.amount + lowest_ask.filled); 
             
@@ -501,8 +489,8 @@ namespace Markets {
             Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, base_amount);
             Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
 
-            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount, total_filled=highest_bid.filled+quote_amount);
-            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=quote_amount, total_filled=filled+quote_amount);
+            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount, total_filled=highest_bid.filled+quote_amount);
+            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=quote_amount, total_filled=filled+quote_amount);
             handle_revoked_refs();
 
             return ();
@@ -513,8 +501,8 @@ namespace Markets {
             let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, 1000000000000000000);
             Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, updated_base_amount);
 
-            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount, total_filled=highest_bid.amount);
-            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=filled+highest_bid.amount-highest_bid.filled);
+            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount, total_filled=highest_bid.amount);
+            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount-highest_bid.filled, total_filled=filled+highest_bid.amount-highest_bid.filled);
 
             sell(caller, market_id, min_price, filled + highest_bid.amount - highest_bid.filled, quote_amount - highest_bid.amount + highest_bid.filled); 
             
@@ -529,7 +517,7 @@ namespace Markets {
     // @return order details returned for event emitted in GatewayContract
     func delete{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (
         order_id : felt, limit_id : felt, market_id : felt, datetime : felt, owner : felt, 
-        base_asset : felt, quote_asset : felt, price : felt, amount : felt, filled : felt
+        base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, filled : felt
     ) {
         alloc_locals;
 
@@ -582,7 +570,7 @@ namespace Markets {
         }
 
         let (datetime) = get_block_timestamp();
-        return (order_id=order.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=order.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=order.price, amount=order.amount, filled=order.filled);
+        return (order_id=order.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=order.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=order.price, quote_amount=order.amount, filled=order.filled);
     }
 
     // Fetches quote for fulfilling market order based on current order book.
@@ -599,8 +587,9 @@ namespace Markets {
     ) -> (price : felt, base_amount : felt, quote_amount : felt) {
         alloc_locals;
 
-        let (market_id) = get_market_ids(base_asset, quote_asset);
-        let (market) = get_market(market_id);
+        let (market_id) = get_market_id(base_asset, quote_asset);
+        let (storage_addr) = Orders.get_storage_address();
+        let (market) = IStorageContract.get_market(storage_addr, market_id);
 
         if (is_buy == 1) {
             let (prices, amounts, length) = Limits.view_limit_tree(market.ask_tree_id);
