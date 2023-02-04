@@ -61,10 +61,6 @@ func markets(market_id : felt) -> (market : Market) {
 @storage_var
 func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
 }
-// Stores pointers to bid and ask limit trees.
-@storage_var
-func trees(tree_id : felt) -> (root_limit_id : felt) {
-}
 // Stores latest market id.
 @storage_var
 func curr_market_id() -> (market_id : felt) {
@@ -302,23 +298,6 @@ func set_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 ) {
     assert_only_gateway();
     market_ids.write(base_asset, quote_asset, new_market_id);
-    return ();
-}
-
-@view
-func get_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt) -> (root_limit_id : felt
-) {
-    let (root_limit_id) = trees.read(tree_id);
-    return (root_limit_id=root_limit_id);
-}
-
-@external
-func set_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    tree_id : felt, new_root_limit_id : felt
-) {
-    assert_only_gateway();
-    trees.write(tree_id, new_root_limit_id);
     return ();
 }
 
