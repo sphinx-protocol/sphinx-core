@@ -134,7 +134,7 @@ func view_order_book{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
 ) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
     alloc_locals;
 
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
     let (market) = Markets.get_market(market_id);
 
     if (is_bid == 1) {
@@ -170,7 +170,7 @@ func view_order_book_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 ) {
     alloc_locals;
 
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
     let (market) = Markets.get_market(market_id);
 
     if (is_bid == 1) {
@@ -190,14 +190,14 @@ func view_order_book_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 // @param post_only : 1 if create bid in post only mode, 0 otherwise
 @external
 func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    create_bid_helper(caller, base_asset, quote_asset, price, amount, post_only);
+    create_bid_helper(caller, base_asset, quote_asset, price, quote_amount, post_only);
     return ();
 }
 
@@ -207,27 +207,27 @@ func create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 // @param post_only : 1 if create bid in post only mode, 0 otherwise
 @external
 func remote_create_bid{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
     with_attr error_message("[Gateway] remote_create_bid > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    create_bid_helper(user, base_asset, quote_asset, price, amount, post_only);
+    create_bid_helper(user, base_asset, quote_asset, price, quote_amount, post_only);
     return ();
 }
 
 // Helper function to create bid.
 func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    Markets.create_bid(user, market_id, price, amount, post_only);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
+    Markets.create_bid(user, market_id, price, quote_amount, post_only);
     return ();
 }
 
@@ -235,14 +235,14 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 // @param post_only : 1 if create ask in post only mode, 0 otherwise
 @external
 func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
-    create_ask_helper(caller, base_asset, quote_asset, price, amount, post_only);
+    create_ask_helper(caller, base_asset, quote_asset, price, quote_amount, post_only);
     return ();
 }
 
@@ -252,40 +252,40 @@ func create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
 // @param price : limit price of order
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 // @param post_only : 1 if create bid in post only mode, 0 otherwise
 @external
 func remote_create_ask{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
     with_attr error_message("[Gateway] remote_create_ask > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    create_ask_helper(user, base_asset, quote_asset, price, amount, post_only);
+    create_ask_helper(user, base_asset, quote_asset, price, quote_amount, post_only);
     return ();
 }
 
 // Helper function to create ask.
 func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
+    user : felt, base_asset : felt, quote_asset : felt, price : felt, quote_amount : felt, post_only : felt
 ) {
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    Markets.create_ask(user, market_id, price, amount, post_only);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
+    Markets.create_ask(user, market_id, price, quote_amount, post_only);
     return ();
 }
 
 // Submit a new market buy to a given market.
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 @external
 func market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt, amount : felt
+    base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
     let (caller) = get_caller_address();
-    market_buy_helper(caller, base_asset, quote_asset, amount);
+    market_buy_helper(caller, base_asset, quote_asset, quote_amount);
     return ();
 }
 
@@ -293,39 +293,39 @@ func market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
 // @param user : felt representation of user EOA
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 @external
 func remote_market_buy{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
     with_attr error_message("[Gateway] remote_market_buy > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    market_buy_helper(user, base_asset, quote_asset, amount);
+    market_buy_helper(user, base_asset, quote_asset, quote_amount);
     return ();
 }
 
 // Helper function to create market buy order.
 func market_buy_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    Markets.buy(user, market_id, MAX_FELT, 0, amount);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
+    Markets.buy(user, market_id, MAX_FELT, 0, quote_amount);
     return ();
 }
 
 // Submit a new market sell to a given market.
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 @external
 func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt, amount : felt
+    base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
     let (caller) = get_caller_address();
-    market_sell_helper(caller, base_asset, quote_asset, amount);
+    market_sell_helper(caller, base_asset, quote_asset, quote_amount);
     return ();
 }
 
@@ -333,26 +333,26 @@ func market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // @param user : felt representation of user EOA
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
-// @param amount : order size in number of tokens of quote asset
+// @param quote_amount : order size in number of tokens of quote asset
 @external
 func remote_market_sell{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
     let (caller) = get_caller_address();
     let (_l2_eth_remote_eip_712_addr) = l2_eth_remote_eip_712_addr.read();
     with_attr error_message("[Gateway] remote_market_sell > Caller must be L2EthRemoteEIP712, got caller {caller}") {
         assert caller = _l2_eth_remote_eip_712_addr;
     }
-    market_sell_helper(user, base_asset, quote_asset, amount);
+    market_sell_helper(user, base_asset, quote_asset, quote_amount);
     return ();
 }
 
 // Helper function to create market sell order.
 func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    user : felt, base_asset : felt, quote_asset : felt, amount : felt
+    user : felt, base_asset : felt, quote_asset : felt, quote_amount : felt
 ) {
-    let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    Markets.sell(user, market_id, 0, 0, amount);
+    let (market_id) = Markets.get_market_id(base_asset, quote_asset);
+    Markets.sell(user, market_id, 0, 0, quote_amount);
     return ();
 }
 
