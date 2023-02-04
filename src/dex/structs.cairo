@@ -21,8 +21,6 @@ struct Limit {
     price : felt,
     total_vol : felt,
     length : felt,
-    head_id : felt, 
-    tail_id : felt,
     tree_id : felt,
     market_id : felt,
 }

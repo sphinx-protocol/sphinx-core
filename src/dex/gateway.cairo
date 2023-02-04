@@ -10,7 +10,7 @@ from src.dex.orders import Orders
 from src.dex.limits import Limits
 from src.dex.balances import Balances
 from src.dex.markets import Markets
-from src.dex.structs import Market
+from src.dex.structs import Order, Market
 from src.dex.events import log_create_bid, log_delete_order
 from src.utils.handle_revoked_refs import handle_revoked_refs
 from lib.math_utils import MathUtils
@@ -51,6 +51,13 @@ namespace IERC20 {
     }
 }
 
+@contract_interface
+namespace IStorageContract {
+    // Get order by order ID
+    func get_order(order_id : felt) -> (order : Order) {
+    }
+}
+
 //
 // Storage vars
 //
@@ -59,17 +66,13 @@ namespace IERC20 {
 @storage_var
 func l2_eth_remote_core_addr() -> (addr : felt) {
 }
-// 1 if L2EthRemoteCore contract address has been set, 0 otherwise
-@storage_var
-func is_eth_remote_core_set() -> (bool : felt) {
-}
 // Stores L2EthRemoteEIP712 contract address.
 @storage_var
 func l2_eth_remote_eip_712_addr() -> (addr : felt) {
 }
-// 1 if L2EthRemoteEIP712 has been set, 0 otherwise
+// Stores storage contract address.
 @storage_var
-func is_eth_remote_eip_712_set() -> (bool : felt) {
+func storage_addr() -> (addr : felt) {
 }
 
 //
@@ -99,15 +102,8 @@ func set_addresses{syscall_ptr : felt*, pedersen_ptr : HashBuiltin*, range_check
     _l2_eth_remote_eip_712_addr : felt
 ) {
     Ownable.assert_only_owner();
-    let (_is_eth_remote_core_set) = is_eth_remote_core_set.read();
-    let (_is_eth_remote_eip_712_set) = is_eth_remote_eip_712_set.read();
-    // with_attr error_message("[Gateway] set_addresses > Addresses have already been set") {
-    //     assert _is_eth_remote_core_set + _is_eth_remote_eip_712_set = 0;
-    // }
     l2_eth_remote_core_addr.write(_l2_eth_remote_core_addr);
     l2_eth_remote_eip_712_addr.write(_l2_eth_remote_eip_712_addr);
-    is_eth_remote_core_set.write(1);
-    is_eth_remote_eip_712_set.write(1);
     return ();
 }
 
@@ -231,10 +227,7 @@ func create_bid_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.create_bid(user, market_id, price, amount, post_only);
-    with_attr error_message("[Gateway] create_bid_helper > Create bid unsuccessful") {
-        assert success = 1;
-    }
+    Markets.create_bid(user, market_id, price, amount, post_only);
     return ();
 }
 
@@ -279,10 +272,7 @@ func create_ask_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, price : felt, amount : felt, post_only : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.create_ask(user, market_id, price, amount, post_only);
-    with_attr error_message("[Gateway] create_ask_helper > Create ask unsuccessful") {
-        assert success = 1;
-    }
+    Markets.create_ask(user, market_id, price, amount, post_only);
     return ();
 }
 
@@ -322,10 +312,7 @@ func market_buy_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.buy(user, market_id, MAX_FELT, 0, amount);
-    with_attr error_message("[Gateway] market_buy_helper > Market buy unsuccessful") {
-        assert success = 1;
-    }
+    Markets.buy(user, market_id, MAX_FELT, 0, amount);
     return ();
 }
 
@@ -365,10 +352,7 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
     user : felt, base_asset : felt, quote_asset : felt, amount : felt
 ) {
     let (market_id) = Markets.get_market_ids(base_asset, quote_asset);
-    let (success) = Markets.sell(user, market_id, 0, 0, amount);
-    with_attr error_message("[Gateway] market_sell_helper > Market sell unsuccessful") {
-        assert success = 1;
-    }
+    Markets.sell(user, market_id, 0, 0, amount);
     return ();
 }
 
@@ -377,7 +361,8 @@ func market_sell_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_ch
 @external
 func cancel_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) {
     let (caller) = get_caller_address();
-    let (order) = Orders.get_order(order_id);
+    let (storage_addr) = Orders.get_storage_address();
+    let (order) = IStorageContract.get_order(storage_addr, order_id);
     if (caller == order.owner) {
         let (order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled) = Markets.delete(order_id);
         log_delete_order.emit(order_id, limit_id, market_id, datetime, owner, base_asset, quote_asset, price, amount, filled);
@@ -419,10 +404,7 @@ func deposit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (a
     }
     
     let (contract_address) = get_contract_address();
-    let (success) = IERC20.transferFrom(asset, caller, contract_address, amount_u256);
-    with_attr error_message("[Gateway] deposit > Transfer from {caller} to {contract_address} unsuccessful") {
-        assert success = 1;
-    }
+    IERC20.transferFrom(asset, caller, contract_address, amount_u256);
 
     deposit_helper(caller, asset, amount);
     return ();
@@ -465,10 +447,7 @@ func withdraw{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     withdraw_helper(caller, asset, amount);
     let (contract_address) = get_contract_address();
     let (amount_u256 : Uint256) = MathUtils.felt_to_uint256(amount);
-    let (success) = IERC20.transfer(asset, caller, amount_u256);
-    with_attr error_message("[Gateway] withdraw > Transfer from {contract_address} to {caller} unsuccessful") {
-        assert success = 1;
-    }
+    IERC20.transfer(asset, caller, amount_u256);
     return ();
 }
 

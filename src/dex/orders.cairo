@@ -63,6 +63,13 @@ namespace Orders {
         return ();
     }
 
+    // Get address of storage contract
+    // @return storage_addr : address of storage contract
+    func get_storage_address{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}() -> (storage_addr : felt) {
+        let (storage_addr) = l2_storage_contract_address.read();
+        return (storage_addr=storage_addr);
+    }
+
     // Insert new order to the end of the list.
     // @param is_buy : 1 if buy order, 0 if sell order
     // @param price : limit price
@@ -75,7 +82,7 @@ namespace Orders {
     ) -> (new_order : Order) {
         alloc_locals;
 
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (id) = IStorageContract.get_curr_order_id(storage_addr);
         tempvar new_order: Order* = new Order(
             order_id=id, next_id=0, is_buy=is_buy, price=price, amount=amount, filled=0, datetime=datetime, owner=owner, limit_id=limit_id
@@ -115,7 +122,7 @@ namespace Orders {
     func shift{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (del : Order) {
         alloc_locals;
 
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (length) = IStorageContract.get_length(storage_addr, limit_id);
         let empty_order : Order* = gen_empty_order();
         if (length == 0) {
@@ -155,7 +162,7 @@ namespace Orders {
     func pop{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (del : Order) {
         alloc_locals;
         
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (length) = IStorageContract.get_length(storage_addr, limit_id);
         let empty_order : Order* = gen_empty_order();
         if (length == 0) {
@@ -201,7 +208,7 @@ namespace Orders {
     func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         id : felt, filled : felt
     ) -> (success : felt) {
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (order) = IStorageContract.get_order(storage_addr, id);
         let is_valid = is_le(filled, order.amount);
         let is_incremental = is_le(order.filled, filled - 1);
@@ -226,7 +233,7 @@ namespace Orders {
     func remove{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order_id : felt) -> (del : Order) {
         alloc_locals;
         
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (removed) = IStorageContract.get_order(storage_addr, order_id);
         let empty_order : Order* = gen_empty_order();
         let is_valid = is_le(1, order_id); 
@@ -271,7 +278,7 @@ namespace Orders {
     // func get{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt, idx : felt) -> (order : Order) {
     //     alloc_locals;
         
-    //     let (storage_addr) = l2_storage_contract_address.read();
+    //     let (storage_addr) = get_storage_address();
     //     let empty_order : Order* = gen_empty_order();
     //     let (in_range) = validate_idx(limit_id, idx);
     //     if (in_range == 0) {
@@ -298,7 +305,7 @@ namespace Orders {
         if (curr.next_id == 0) {
             return (prev_id=0);
         }
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
         return locate_previous_item(next, curr, order_id);
     }
@@ -313,7 +320,7 @@ namespace Orders {
         if (i == idx) {
             return (order=curr);
         }
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (next) = IStorageContract.get_order(storage_addr, curr.next_id);
         return locate_item_from_head(i + 1, idx, next);
     }
@@ -326,7 +333,7 @@ namespace Orders {
     ) -> (in_range : felt) {
         alloc_locals;
         
-        let (storage_addr) = l2_storage_contract_address.read();
+        let (storage_addr) = get_storage_address();
         let (length) = IStorageContract.get_length(storage_addr, limit_id);
         let idx_negative = is_le(idx, -1);
         let idx_out_of_bounds = is_le(length, idx);
