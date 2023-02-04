@@ -1,4 +1,4 @@
-// This contract is a wrapper on the StarkNet DEX Orders contract to allow unit testing.
+// This contract is a wrapper on the StarkNet DEX Limits contract to allow unit testing.
 
 %lang starknet
 
@@ -6,7 +6,7 @@ from starkware.cairo.common.cairo_builtins import HashBuiltin
 
 from src.dex.orders import Orders
 from src.dex.limits import Limits
-from src.dex.structs import Limit
+from src.dex.structs import Order, Limit
 
 //
 // Constructor
@@ -87,4 +87,13 @@ func view_limit_tree_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 ) {
     let (prices, amounts, owners, ids, length) = Limits.view_limit_tree_orders(tree_id);
     return (prices_len=length, prices=prices, amounts_len=length, amounts=amounts, owners_len=length, owners=owners, ids_len=length, ids=ids);
+}
+
+
+@external
+func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
+    is_buy : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
+) -> (new_order : Order) {
+    let (new_order) = Orders.push(is_buy, price, amount, datetime, owner, limit_id);
+    return (new_order=new_order);
 }
