@@ -1,8 +1,8 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
-from src.dex.structs import Limit
 from src.dex.limits import Limits
+from src.dex.structs import Order, Limit
 
 @contract_interface
 namespace ILimitsContract {
@@ -27,8 +27,11 @@ namespace ILimitsContract {
     // View limit tree.
     func view_limit_tree(tree_id : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
     }
-    // Helper function to retrieve limit tree
-    func view_limit_tree_helper(tree_id : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len : felt, owners : felt*, ids_len : felt, ids : felt*) {
+    // View limit tree orders.
+    func view_limit_tree_orders(tree_id : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len : felt, owners : felt*, ids_len : felt, ids : felt*) {
+    }
+    // Insert new order to the end of the list.
+    func push(is_buy : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
     }
 }
 
@@ -39,21 +42,6 @@ namespace IStorageContract {
     }
     // Get limit by limit ID
     func get_limit(limit_id : felt) -> (limit : Limit) {
-    }
-    // Set limit by limit ID
-    func set_limit(limit_id : felt, new_limit : Limit) {
-    }
-    // Get root node by tree ID
-    func get_root(tree_id : felt) -> (id : felt) {
-    }
-    // Set root node by tree ID
-    func set_root(tree_id : felt, new_id : felt) {
-    }
-    // Get latest limit id
-    func get_curr_limit_id() -> (id : felt) {
-    }
-    // Set latest limit id
-    func set_curr_limit_id(new_id : felt) {
     }
 }
 
@@ -88,6 +76,7 @@ func test_limits{
     ILimitsContract.insert(limits_addr, 70, 1, 1);
     ILimitsContract.insert(limits_addr, 60, 1, 1);
     ILimitsContract.insert(limits_addr, 80, 1, 1);
+    ILimitsContract.insert(limits_addr, 20, 2, 1);
     let (prices_len, prices, amounts_len, amounts) = ILimitsContract.view_limit_tree(limits_addr, 1);
     assert prices_len = 5;
     assert prices[0] = 40;
@@ -100,12 +89,54 @@ func test_limits{
     let (limit, parent) = ILimitsContract.find(limits_addr, 40, 1);
     assert limit.limit_id = 2;
     assert parent.limit_id = 1;
+
+    // Test 3 : Should fetch minimum price in tree
+    let (min_limit) = ILimitsContract.get_min(limits_addr, 1);
+    assert min_limit.price = 40;
+
+    // Test 4 : Should fetch maximum price in tree
+    let (max_limit) = ILimitsContract.get_max(limits_addr, 1);
+    assert max_limit.price = 80;
+
+    // Test 5 : Should update limit price
+    ILimitsContract.update(limits_addr, 1, 1000, 5);
+    let (limit_1) = IStorageContract.get_limit(storage_addr, 1);
+    assert limit_1.total_vol = 1000;
+    assert limit_1.length = 5;
+
+    // Test 6 : view_limit_tree should fetch limit tree properly
+    let (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) = ILimitsContract.view_limit_tree(limits_addr, 1);
+    assert prices[0] = 40;
+    assert prices[1] = 50;
+    assert prices[2] = 60;
+    assert prices[3] = 70;
+    assert prices[4] = 80;
+    assert amounts[1] = 1000;
+
+    // Test 7 : view_limit_tree_orders should fetch limit tree orders properly
+    ILimitsContract.push(limits_addr, is_buy=1, price=40, amount=500, datetime=12412424, owner=owner, limit_id=1);
+    ILimitsContract.push(limits_addr, is_buy=1, price=40, amount=700, datetime=12412424, owner=owner, limit_id=1);
     
-    
-    %{ print("Prices:") %}
-    print_array(prices, prices_len);
-    %{ print("Amounts:") %}
-    print_array(amounts, amounts_len);
+    let (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len : felt, owners : felt*, ids_len : felt, ids : felt*) = ILimitsContract.view_limit_tree_orders(limits_addr, 1);
+    assert prices[0] = 40;
+    assert amounts[1] = 700;
+    assert owners[1] = owner;
+
+    // Test 8 : Should delete limit price from BST
+    let (del_1) = ILimitsContract.delete(limits_addr, 70, 1, 1);
+    assert del_1.limit_id = 3;
+    ILimitsContract.delete(limits_addr, 40, 1, 1);
+    ILimitsContract.delete(limits_addr, 60, 1, 1);
+    ILimitsContract.delete(limits_addr, 80, 1, 1);
+    ILimitsContract.delete(limits_addr, 50, 1, 1);
+    let (empty_limit) = ILimitsContract.delete(limits_addr, 70, 1, 1);
+    assert empty_limit.limit_id = 0;
+
+    // Print limit orders
+    // %{ print("Prices:") %}
+    // print_array(prices, prices_len);
+    // %{ print("Amounts:") %}
+    // print_array(amounts, amounts_len);
 
     %{ stop_prank_callable() %}
 
