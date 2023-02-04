@@ -3,7 +3,7 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin, BitwiseBuiltin
 
 from src.dex.structs import Order
-from src.bitwise.bitpacking import pack_order, unpack_slab_in_range, retrieve_order_id
+from src.dex.bitpacking import pack_order, unpack_slab_in_range, retrieve_order_id
 
 @external
 func test_bitpacking{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}() {
