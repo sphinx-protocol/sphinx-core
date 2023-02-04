@@ -1,11 +1,78 @@
 %lang starknet
 
 from starkware.cairo.common.cairo_builtins import HashBuiltin
+from lib.math_utils import MathUtils
+from starkware.cairo.common.uint256 import Uint256
+
 from src.dex.balances import Balances
 from src.dex.markets import Markets
 from src.dex.limits import Limits
 from src.dex.orders import Orders
-from src.dex.structs import Market
+from src.dex.structs import Order, Limit, Market
+
+@contract_interface
+namespace IMarketsContract {
+    // Create a new market for exchanging between two assets.
+    func create_market(base_asset : felt, quote_asset : felt) -> (new_market : Market) {
+    }
+    // Get market IDs from base and quote asset addresses.
+    func get_market_id(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
+    }
+    // Submit a new bid (limit buy order) to a given market.
+    func create_bid(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) {
+    }
+    // Submit a new ask (limit sell order) to a given market.
+    func create_ask(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) {
+    }
+    // Submit a new market buy to a given market.
+    func buy(caller : felt, market_id : felt, amount : felt) {
+    }
+    // Submit a new market sell to a given market.
+    func sell(caller : felt, market_id : felt, amount : felt) {
+    }
+    // Delete an order and update limits, markets and balances.
+    func cancel_order(order_id : felt) {
+    }
+}
+
+@contract_interface
+namespace IStorageContract {
+    // Set external contract address
+    func set_gateway_address(_l2_gateway_contract_address : felt) {
+    }
+    // Get order by order ID
+    func get_order(order_id : felt) -> (order : Order) {
+    }
+    // Get limit by limit ID
+    func get_limit(limit_id : felt) -> (limit : Limit) {
+    }
+    // Get root limit node by tree ID
+    func get_root(tree_id : felt) -> (limit_id : felt) {
+    }
+    // Get market by market ID
+    func get_market(market_id : felt) -> (market : Market) {
+    }
+    // Set user account balance
+    func set_account_balance(user : felt, asset : felt, new_amount : felt) {
+    }
+}
+
+
+@contract_interface
+namespace IERC20 {
+    // Approve spender
+    func approve(spender: felt, amount: Uint256) -> (success: felt) {
+    }
+    // Account balance
+    func balanceOf(account: felt) -> (balance: Uint256) {
+    }
+    // Transfer amount to recipient
+    func transfer(recipient: felt, amount: Uint256) -> (success: felt) {
+    }
+    // Transfer amount from sender to recipient
+    func transferFrom(sender : felt, recipient: felt, amount: Uint256) -> (success: felt) {
+    }
+}
 
 @external
 func test_markets{
@@ -15,37 +82,99 @@ func test_markets{
 } () {
     alloc_locals;
     
-    // Set contract addresses
+    // Set addresses
+    const owner = 11111111;
     const buyer = 123456789;
     const seller = 666666666;
     const base_asset = 123213123123;
     const quote_asset = 788978978998;
+    const gateway_addr = 789789789;
 
-    // Create new market
-    let (new_market) = Markets.create_market(base_asset, quote_asset);
-    %{ print("market_id: {}, bid_tree_id: {}, ask_tree_id: {}".format(ids.new_market.id, ids.new_market.bid_tree_id, ids.new_market.ask_tree_id))%}
+    // Deploy contracts
+    local storage_addr : felt;
+    local markets_addr : felt;
+    %{ ids.storage_addr = deploy_contract("./src/dex/storage.cairo", [ids.owner]).contract_address %}
+    %{ ids.markets_addr = deploy_contract("./src/dex/test/markets.cairo", [ids.storage_addr]).contract_address %}
 
-    // Fund user balances (fake deposit)
-    Balances.set_balance(buyer, base_asset, 1, 5000);
-    Balances.set_balance(seller, quote_asset, 1, 5000);
+    // Invoke functions
+    %{ stop_prank_callable = start_prank(ids.owner, target_contract_address=ids.storage_addr) %}
+    IStorageContract.set_gateway_address(storage_addr, gateway_addr);
+    %{ stop_prank_callable() %}
 
-    // Place orders
-    Markets.create_bid(base_asset, quote_asset, 900 * 1000000000000000000, 1000 * 1000000000000000, 1);
-    %{ stop_warp = warp(200) %}
-    Markets.create_bid(base_asset, quote_asset, 800 * 1000000000000000000, 1000 * 1000000000000000, 1);
-    %{ stop_warp = warp(220) %}
-    Markets.create_bid(base_asset, quote_asset, 700 * 1000000000000000000, 200 * 1000000000000000, 1);
-    %{ stop_warp = warp(321) %}
+    // 'Fund' user balances
+    %{ stop_prank_callable = start_prank(ids.gateway_addr, target_contract_address=ids.storage_addr) %}
+    IStorageContract.set_account_balance(storage_addr, buyer, base_asset, 10000 * 1000000000000000000);
+    IStorageContract.set_account_balance(storage_addr, seller, quote_asset, 10000 * 1000000000000000000);
+    %{ stop_prank_callable() %}
 
-    Markets.create_ask(base_asset, quote_asset, 1000 * 1000000000000000000, 500 * 1000000000000000, 0);
-    %{ stop_warp = warp(335) %}
-    Markets.create_ask(base_asset, quote_asset, 1500 * 1000000000000000000, 300 * 1000000000000000, 0);
-    %{ stop_warp = warp(350) %}
-    Markets.create_ask(base_asset, quote_asset, 2000 * 1000000000000000000, 300 * 1000000000000000, 0);
-    %{ stop_warp %}
+    // Tests
+    %{ stop_prank_callable = start_prank(ids.gateway_addr, target_contract_address=ids.storage_addr) %}
 
-    let (price) = Markets.fetch_quote(base_asset, quote_asset, 1, 700);
-    %{ print(ids.price) %}
+    // Test 1 : Should create new market
+    let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset);
+    assert new_market.market_id = 1;
+    assert new_market.bid_tree_id = 1;
+    assert new_market.ask_tree_id = 2;
+    assert new_market.base_asset = base_asset;
+
+    // Test 2 : Should fail to create existing market
+    // TODO: uncomment and replace with Protostar cheatcode for expect failure)
+    // IMarketsContract.create_market(markets_addr, quote_asset, base_asset);
+
+    // Test 3 : Should fail to create market with same base and quote asset
+    // TODO: uncomment and replace with Protostar cheatcode for expect failure)
+    // IMarketsContract.create_market(markets_addr, base_asset, base_asset);
+
+    // Test 4 : Should fetch market IDs
+    IMarketsContract.create_market(markets_addr, 712317239, 41823823);
+    let (market_id) = IMarketsContract.get_market_id(markets_addr, base_asset, quote_asset);
+    let (market_id_reverse) = IMarketsContract.get_market_id(markets_addr, quote_asset, base_asset);
+    assert market_id = 1;
+    assert market_id_reverse = 1;
+
+    // Test 5 : Should create bids
+    IMarketsContract.create_bid(markets_addr, buyer, market_id, 800 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IMarketsContract.create_bid(markets_addr, buyer, market_id, 700 * 1000000000000000000, 500 * 1000000000000000, 1);
+    IMarketsContract.create_bid(markets_addr, buyer, market_id, 900 * 1000000000000000000, 200 * 1000000000000000, 1);
+    IMarketsContract.create_bid(markets_addr, buyer, market_id, 700 * 1000000000000000000, 50 * 1000000000000000, 1);
+    let (market) = IStorageContract.get_market(storage_addr, market_id);
+    let (bid_tree_root_id) = IStorageContract.get_root(storage_addr, market.bid_tree_id);
+    let (bid_tree_root) = IStorageContract.get_limit(storage_addr, bid_tree_root_id);
+    assert bid_tree_root.price = 800 * 1000000000000000000;
+    assert bid_tree_root.left_id = 2;
+    assert bid_tree_root.length = 1;
+    let (left_child) = IStorageContract.get_limit(storage_addr, bid_tree_root.left_id);
+    assert left_child.length = 2;
+    let (order) = IStorageContract.get_order(storage_addr, 2);
+    assert order.order_id = 2;
+    assert order.price = 700 * 1000000000000000000;
+    assert order.limit_id = 2;
+
+    // Test 6 : Should create asks
+    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1100 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1000 * 1000000000000000000, 500 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1250 * 1000000000000000000, 200 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1000 * 1000000000000000000, 50 * 1000000000000000, 1);
+    let (ask_tree_root_id) = IStorageContract.get_root(storage_addr, market.ask_tree_id);
+    let (ask_tree_root) = IStorageContract.get_limit(storage_addr, ask_tree_root_id);
+    assert ask_tree_root.price = 1100 * 1000000000000000000;
+    assert ask_tree_root.left_id = 6;
+    let (right_child) = IStorageContract.get_limit(storage_addr, ask_tree_root.right_id);
+    assert right_child.length = 1;
+    let (order_2) = IStorageContract.get_order(storage_addr, 8);
+    assert order_2.price = 1000 * 1000000000000000000;
+    assert order.limit_id = 4;
+
+    %{ stop_prank_callable() %}
 
     return ();
 }
+
+// Utility function to handle printing info about a limit price.
+func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
+    %{ 
+        print("limit_id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, tree_id: {}".format(ids.limit.limit_id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.length, ids.limit.tree_id, ids.limit.market_id)) 
+    %}
+    return ();
+}
+
