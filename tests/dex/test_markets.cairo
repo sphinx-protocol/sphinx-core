@@ -10,6 +10,8 @@ from src.dex.limits import Limits
 from src.dex.orders import Orders
 from src.dex.structs import Order, Limit, Market
 
+const MAX_FELT = 340282366920938463463374607431768211456; 
+
 @contract_interface
 namespace IMarketsContract {
     // Create a new market for exchanging between two assets.
@@ -25,10 +27,10 @@ namespace IMarketsContract {
     func create_ask(caller : felt, market_id : felt, price : felt, amount : felt, post_only : felt) {
     }
     // Submit a new market buy to a given market.
-    func buy(caller : felt, market_id : felt, amount : felt) {
+    func buy(caller : felt, market_id : felt, max_price : felt, filled : felt, quote_amount : felt) {
     }
     // Submit a new market sell to a given market.
-    func sell(caller : felt, market_id : felt, amount : felt) {
+    func sell(caller : felt, market_id : felt, min_price : felt, filled : felt, quote_amount : felt) {
     }
     // Delete an order and update limits, markets and balances.
     func cancel_order(order_id : felt) {
@@ -151,22 +153,83 @@ func test_markets{
     assert order.limit_id = 2;
 
     // Test 6 : Should create asks
-    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1100 * 1000000000000000000, 1000 * 1000000000000000, 1);
-    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1000 * 1000000000000000000, 500 * 1000000000000000, 1);
-    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1250 * 1000000000000000000, 200 * 1000000000000000, 1);
-    IMarketsContract.create_ask(markets_addr, buyer, market_id, 1000 * 1000000000000000000, 50 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, seller, market_id, 1100 * 1000000000000000000, 200 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, seller, market_id, 1000 * 1000000000000000000, 500 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, seller, market_id, 1250 * 1000000000000000000, 1000 * 1000000000000000, 1);
+    IMarketsContract.create_ask(markets_addr, seller, market_id, 1000 * 1000000000000000000, 50 * 1000000000000000, 1);
     let (ask_tree_root_id) = IStorageContract.get_root(storage_addr, market.ask_tree_id);
     let (ask_tree_root) = IStorageContract.get_limit(storage_addr, ask_tree_root_id);
     assert ask_tree_root.price = 1100 * 1000000000000000000;
-    assert ask_tree_root.left_id = 6;
+    assert ask_tree_root.left_id = 5;
     let (right_child) = IStorageContract.get_limit(storage_addr, ask_tree_root.right_id);
     assert right_child.length = 1;
     let (order_2) = IStorageContract.get_order(storage_addr, 8);
     assert order_2.price = 1000 * 1000000000000000000;
-    assert order.limit_id = 4;
+    assert order_2.limit_id = 5;
+
+    // Test 7 : Bid above min ask price with post only mode should fail
+    // TODO: uncomment and replace with Protostar cheatcode for expect failure)
+    // IMarketsContract.create_bid(markets_addr, buyer, market_id, 1200 * 1000000000000000000, 1000 * 1000000000000000, 1);
+
+    // Test 8 : Bid above min ask price with post only mode disabled should fill a buy
+    IMarketsContract.create_bid(markets_addr, buyer, market_id, 1200 * 1000000000000000000, 500 * 1000000000000000, 0);
+    let (filled) = IStorageContract.get_order(storage_addr, 6);
+    assert filled.filled = 500 * 1000000000000000;
+    let (next) = IStorageContract.get_order(storage_addr, 8);
+    assert next.filled = 0;
+    
+    // Test 9 : Ask below max bid price with post only mode should fail
+    // TODO: uncomment and replace with Protostar cheatcode for expect failure)
+    // IMarketsContract.create_ask(markets_addr, seller, market_id, 850 * 1000000000000000000, 100 * 1000000000000000, 1);
+
+    // Test 10 : Ask below max bid price with post only mode disabled should fill a sell
+    IMarketsContract.create_ask(markets_addr, seller, market_id, 850 * 1000000000000000000, 100 * 1000000000000000, 0);
+    let (filled_2) = IStorageContract.get_order(storage_addr, 3);
+    assert filled_2.filled = 100 * 1000000000000000;
+
+    // Test 11 : Buy should fill successfully over single order
+    let (test) = IStorageContract.get_order(storage_addr, 8);
+    print_order(test);
+    IMarketsContract.buy(markets_addr, buyer, market_id, MAX_FELT, 0, 50 * 1000000000000000);
+    let (filled_3) = IStorageContract.get_order(storage_addr, 8);
+    assert filled_3.filled = 50 * 1000000000000000;
+    
+    // Test 12 : Buy should fill successfully over multiple orders, including partial fills
+    IMarketsContract.buy(markets_addr, buyer, market_id, MAX_FELT, 0, 300 * 1000000000000000);
+    let (filled_4) = IStorageContract.get_order(storage_addr, 5);
+    let (filled_5) = IStorageContract.get_order(storage_addr, 7);
+    assert filled_4.filled = 200 * 1000000000000000;
+    assert filled_5.filled = 100 * 1000000000000000;
+
+    // Test 13 : Sells should fill successfully over single order
+    IMarketsContract.sell(markets_addr, seller, market_id, 0, 0, 100 * 1000000000000000);
+    let (filled_6) = IStorageContract.get_order(storage_addr, 3);
+    assert filled_6.filled = 200 * 1000000000000000;
+
+    // Test 14 : Sells should fill successfully over multiple orders, including partial fills
+    IMarketsContract.sell(markets_addr, seller, market_id, 0, 0, 1500 * 1000000000000000);
+    let (filled_7) = IStorageContract.get_order(storage_addr, 1);
+    let (filled_8) = IStorageContract.get_order(storage_addr, 2);
+    assert filled_7.filled = 1000 * 1000000000000000;
+    assert filled_8.filled = 500 * 1000000000000000;
+
+    // Test 15 : Buy at below lowest ask should create a bid
+    // Test 16 : Selling at above highest bid should create an ask
+    // Test 17 : Should be able to cancel order
+
+    // Test emit events
 
     %{ stop_prank_callable() %}
 
+    return ();
+}
+
+// Utility function for printing order.
+func print_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (order : Order) {
+    %{
+        print("    ", end="")
+        print("order_id: {}, next_id: {}, is_buy: {}, price: {}, amount: {}, filled: {}, datetime: {}, owner: {}, limit_id: {}".format(ids.order.order_id, ids.order.next_id, ids.order.is_buy, ids.order.price, ids.order.amount, ids.order.filled, ids.order.datetime, ids.order.owner, ids.order.limit_id))
+    %}
     return ();
 }
 
