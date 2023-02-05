@@ -189,7 +189,6 @@ func test_markets{
 
     // Test 11 : Buy should fill successfully over single order
     let (test) = IStorageContract.get_order(storage_addr, 8);
-    print_order(test);
     IMarketsContract.buy(markets_addr, buyer, market_id, MAX_FELT, 0, 50 * 1000000000000000);
     let (filled_3) = IStorageContract.get_order(storage_addr, 8);
     assert filled_3.filled = 50 * 1000000000000000;
