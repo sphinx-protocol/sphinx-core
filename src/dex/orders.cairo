@@ -199,7 +199,6 @@ namespace Orders {
     func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         order_id : felt, filled : felt
     ) {
-        %{ print("id: {}, filled: {}".format(ids.order_id, ids.filled)) %}
         let (storage_addr) = get_storage_address();
         let (order) = IStorageContract.get_order(storage_addr, order_id);
         let is_valid = is_le(filled, order.amount);
