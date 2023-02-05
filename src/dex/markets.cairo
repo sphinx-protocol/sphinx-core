@@ -381,9 +381,7 @@ namespace Markets {
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         
         let is_sufficient = is_le(base_amount, account_balance);
-        // %{ print("caller: {}, base_amount: {}, account_balance: {}".format(ids.caller, ids.base_amount, ids.account_balance)) %}
         let is_positive = is_le(1, quote_amount);
-        // %{ print("is_sufficient: {}, is_positive: {}, market.market_id: {}".format(ids.is_sufficient, ids.is_positive, ids.market.market_id)) %}
         if (is_sufficient * is_positive * market.market_id == 0) {
             handle_revoked_refs();
             with_attr error_message("Balance insufficient, amount negative or market does not exist") {
@@ -393,7 +391,7 @@ namespace Markets {
         } else {
             handle_revoked_refs();
         }
-        
+
         let is_below_max_price = is_le(lowest_ask.price, max_price);
         if (is_below_max_price == 0) {
             create_bid(caller, market_id, max_price, quote_amount, 0);
@@ -406,6 +404,7 @@ namespace Markets {
         let (datetime) = get_block_timestamp();
         let is_partial_fill = is_le(quote_amount, lowest_ask.amount - lowest_ask.filled - 1);
         let (limit) = IStorageContract.get_limit(storage_addr, lowest_ask.limit_id);
+
         if (is_partial_fill == 1) {
             // Partial fill of order
             Orders.set_filled(lowest_ask.order_id, lowest_ask.filled + quote_amount);
@@ -414,8 +413,8 @@ namespace Markets {
             Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, quote_amount);
             Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
             
-            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=quote_amount, total_filled=lowest_ask.filled+quote_amount);
-            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=quote_amount, total_filled=filled+quote_amount);
+            log_offer_taken.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, lowest_ask.owner, caller, market.base_asset, market.quote_asset, lowest_ask.price, quote_amount, lowest_ask.filled+quote_amount);
+            log_buy_filled.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask.owner, market.base_asset, market.quote_asset, lowest_ask.price, quote_amount, filled+quote_amount);
             handle_revoked_refs();
             return ();
         } else {
@@ -424,12 +423,18 @@ namespace Markets {
             let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, 1000000000000000000);
             Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
             Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, lowest_ask.amount - lowest_ask.filled);
+            Orders.set_filled(lowest_ask.order_id, lowest_ask.amount);
 
-            log_offer_taken.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=lowest_ask.owner, buyer=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=lowest_ask.amount, total_filled=lowest_ask.amount);
-            log_buy_filled.emit(order_id=lowest_ask.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, buyer=caller, seller=lowest_ask.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=lowest_ask.price, quote_amount=lowest_ask.amount-lowest_ask.filled, total_filled=filled+lowest_ask.amount-lowest_ask.filled);
+            log_offer_taken.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, lowest_ask.owner, caller, market.base_asset, market.quote_asset, lowest_ask.price, lowest_ask.amount, lowest_ask.amount);
+            log_buy_filled.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask.owner, market.base_asset, market.quote_asset, lowest_ask.price, lowest_ask.amount-lowest_ask.filled, filled+lowest_ask.amount-lowest_ask.filled);
 
-            buy(caller, market_id, max_price, filled + lowest_ask.amount - lowest_ask.filled, quote_amount - lowest_ask.amount + lowest_ask.filled); 
-            
+            if (quote_amount - lowest_ask.amount + lowest_ask.filled == 0) {
+                handle_revoked_refs();
+            } else {
+                handle_revoked_refs();
+                buy(caller, market_id, max_price, filled + lowest_ask.amount - lowest_ask.filled, quote_amount - lowest_ask.amount + lowest_ask.filled);
+            }
+
             handle_revoked_refs();
             return ();
         }
@@ -500,12 +505,18 @@ namespace Markets {
             Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, quote_amount);
             let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, 1000000000000000000);
             Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, updated_base_amount);
+            Orders.set_filled(highest_bid.order_id, highest_bid.amount);
 
-            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount, total_filled=highest_bid.amount);
-            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount-highest_bid.filled, total_filled=filled+highest_bid.amount-highest_bid.filled);
-
-            sell(caller, market_id, min_price, filled + highest_bid.amount - highest_bid.filled, quote_amount - highest_bid.amount + highest_bid.filled); 
+            log_bid_taken.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, highest_bid.owner, caller, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount, highest_bid.amount);
+            log_sell_filled.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount-highest_bid.filled, filled+highest_bid.amount-highest_bid.filled);
             
+            if (quote_amount - highest_bid.amount + highest_bid.filled == 0) {
+                handle_revoked_refs();
+            } else {
+                handle_revoked_refs();
+                sell(caller, market_id, min_price, filled + highest_bid.amount - highest_bid.filled, quote_amount - highest_bid.amount + highest_bid.filled); 
+            }
+
             handle_revoked_refs();
             return ();
         }
@@ -628,7 +639,6 @@ namespace Markets {
             } else {
                 handle_revoked_refs();
                 let (price, _) = unsigned_div_rem(total_base * 1000000000000000000, total_quote);
-                // %{ print("price: {}, base_amount: {}, quote_amount: {}".format(ids.price, ids.total_base, ids.total_quote)) %}
                 return (price=price, base_amount=total_base, quote_amount=total_quote);
             }
         } else {
