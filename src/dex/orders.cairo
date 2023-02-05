@@ -174,8 +174,6 @@ namespace Orders {
         let (old_tail) = locate_item_from_head(0, length - 1, head);
 
         if (length - 1 == 0) {
-            IStorageContract.set_order(storage_addr, head_id, [empty_order]);
-            IStorageContract.set_order(storage_addr, old_tail.order_id, [empty_order]);
             IStorageContract.set_head(storage_addr, limit_id, 0);
             handle_revoked_refs();
         } else {
@@ -192,23 +190,18 @@ namespace Orders {
 
         IStorageContract.set_length(storage_addr, limit_id, length - 1);
 
-        // Diagnostics
-        // %{ print("Deleted: ") %}
-        // print_order(old_tail);
-        // print_order_list(head_id, length - 1, 1);
-
         return (del=old_tail);
     }
-
 
     // Update filled amount of order.
     // @param id : order ID
     // @param filled : updated filled amount of order
     func set_filled{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        id : felt, filled : felt
+        order_id : felt, filled : felt
     ) {
+        %{ print("id: {}, filled: {}".format(ids.order_id, ids.filled)) %}
         let (storage_addr) = get_storage_address();
-        let (order) = IStorageContract.get_order(storage_addr, id);
+        let (order) = IStorageContract.get_order(storage_addr, order_id);
         let is_valid = is_le(filled, order.amount);
         let is_incremental = is_le(order.filled, filled - 1);
         let is_positive = is_le(1, filled);
