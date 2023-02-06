@@ -92,8 +92,8 @@ func view_limit_tree_orders{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, rang
 
 @external
 func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}(
-    is_buy : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
+    is_bid : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
 ) -> (new_order : Order) {
-    let (new_order) = Orders.push(is_buy, price, amount, datetime, owner, limit_id);
+    let (new_order) = Orders.push(is_bid, price, amount, datetime, owner, limit_id);
     return (new_order=new_order);
 }

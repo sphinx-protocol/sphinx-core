@@ -31,7 +31,7 @@ namespace ILimitsContract {
     func view_limit_tree_orders(tree_id : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len : felt, owners : felt*, ids_len : felt, ids : felt*) {
     }
     // Insert new order to the end of the list.
-    func push(is_buy : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
+    func push(is_bid : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt) -> (new_order : Order) {
     }
 }
 
@@ -114,8 +114,8 @@ func test_limits{
     assert amounts[1] = 1000;
 
     // Test 7 : view_limit_tree_orders should fetch limit tree orders properly
-    ILimitsContract.push(limits_addr, is_buy=1, price=40, amount=500, datetime=12412424, owner=owner, limit_id=1);
-    ILimitsContract.push(limits_addr, is_buy=1, price=40, amount=700, datetime=12412424, owner=owner, limit_id=1);
+    ILimitsContract.push(limits_addr, is_bid=1, price=40, amount=500, datetime=12412424, owner=owner, limit_id=1);
+    ILimitsContract.push(limits_addr, is_bid=1, price=40, amount=700, datetime=12412424, owner=owner, limit_id=1);
     
     let (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len : felt, owners : felt*, ids_len : felt, ids : felt*) = ILimitsContract.view_limit_tree_orders(limits_addr, 1);
     assert prices[0] = 40;

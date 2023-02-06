@@ -539,7 +539,7 @@ namespace Markets {
         let (market) = IStorageContract.get_market(storage_addr, limit.market_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, order.limit_id);
 
-        if (order.is_buy == 1) {
+        if (order.is_bid == 1) {
             if (limit.length == 1) {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_max(limit.tree_id);
@@ -587,14 +587,14 @@ namespace Markets {
     // Fetches quote for fulfilling market order based on current order book.
     // @param base_asset : felt representation of ERC20 base asset contract address
     // @param quote_asset : felt representation of ERC20 quote asset contract address
-    // @param is_buy : 1 for market buy order, 0 for market sell order
+    // @param is_bid : 1 for market buy order, 0 for market sell order
     // @param amount : size of order in terms of quote asset
     // @return price : quote price
     // @return base_amount : order amount in terms of base asset
     // @return quote_amount : order amount in terms of quote asset
     @view
     func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt
+        base_asset : felt, quote_asset : felt, is_bid : felt, amount : felt
     ) -> (price : felt, base_amount : felt, quote_amount : felt) {
         alloc_locals;
 
@@ -602,7 +602,7 @@ namespace Markets {
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
 
-        if (is_buy == 1) {
+        if (is_bid == 1) {
             let (prices, amounts, length) = Limits.view_limit_tree(market.ask_tree_id);
             let (rev_prices : felt*) = alloc();
             let (rev_amounts : felt*) = alloc();

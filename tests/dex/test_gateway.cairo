@@ -65,7 +65,7 @@ namespace IGatewayContract {
     func view_order_book_orders(base_asset : felt, quote_asset : felt, is_bid : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*, owners_len: felt, owners: felt*, ids_len: felt, ids: felt*) {
     }
     // Fetches quote for market order based on current order book.
-    func fetch_quote(base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt) -> (price : felt, base_amount : felt, quote_amount : felt) {
+    func fetch_quote(base_asset : felt, quote_asset : felt, is_bid : felt, amount : felt) -> (price : felt, base_amount : felt, quote_amount : felt) {
     }
 }
 

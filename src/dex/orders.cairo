@@ -71,21 +71,21 @@ namespace Orders {
     }
 
     // Insert new order to the end of the list.
-    // @param is_buy : 1 if buy order, 0 if sell order
+    // @param is_bid : 1 if buy order, 0 if sell order
     // @param price : limit price
     // @param amount : amount of order
     // @param datetime : datetime of order entry
     // @param owner : owner of order
     // @param limit_id : ID of limit price corresponding to order
     func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        is_buy : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
+        is_bid : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
     ) -> (new_order : Order) {
         alloc_locals;
 
         let (storage_addr) = get_storage_address();
         let (id) = IStorageContract.get_curr_order_id(storage_addr);
         tempvar new_order: Order* = new Order(
-            order_id=id, next_id=0, is_buy=is_buy, price=price, amount=amount, filled=0, datetime=datetime, owner=owner, limit_id=limit_id
+            order_id=id, next_id=0, is_bid=is_bid, price=price, amount=amount, filled=0, datetime=datetime, owner=owner, limit_id=limit_id
         );
         IStorageContract.set_order(storage_addr, id, [new_order]);
         IStorageContract.set_curr_order_id(storage_addr, id + 1);
@@ -101,12 +101,12 @@ namespace Orders {
             let (head) = IStorageContract.get_order(storage_addr, head_id);
             let (old_tail) = locate_item_from_head(0, length - 1, head);
             tempvar old_tail_updated: Order* = new Order(
-                order_id=old_tail.order_id, next_id=new_order.order_id, is_buy=old_tail.is_buy, price=old_tail.price, amount=old_tail.amount, 
+                order_id=old_tail.order_id, next_id=new_order.order_id, is_bid=old_tail.is_bid, price=old_tail.price, amount=old_tail.amount, 
                 filled=old_tail.filled, datetime=old_tail.datetime, owner=old_tail.owner, limit_id=old_tail.limit_id
             );
             IStorageContract.set_order(storage_addr, old_tail.order_id, [old_tail_updated]);
             tempvar new_tail: Order* = new Order(
-                order_id=new_order.order_id, next_id=0, is_buy=new_order.is_buy, price=new_order.price, amount=new_order.amount, 
+                order_id=new_order.order_id, next_id=0, is_bid=new_order.is_bid, price=new_order.price, amount=new_order.amount, 
                 filled=new_order.filled, datetime=new_order.datetime, owner=new_order.owner, limit_id=new_order.limit_id
             );
             IStorageContract.set_order(storage_addr, new_order.order_id, [new_tail]);
@@ -139,7 +139,7 @@ namespace Orders {
             IStorageContract.set_head(storage_addr, limit_id, old_head.next_id);
             let (new_head) = IStorageContract.get_order(storage_addr, old_head.next_id);
             tempvar new_head_updated: Order* = new Order(
-                order_id=new_head.order_id, next_id=new_head.next_id, is_buy=new_head.is_buy, price=new_head.price, 
+                order_id=new_head.order_id, next_id=new_head.next_id, is_bid=new_head.is_bid, price=new_head.price, 
                 amount=new_head.amount, filled=new_head.filled, datetime=new_head.datetime, owner=new_head.owner, 
                 limit_id=new_head.limit_id
             );
@@ -181,7 +181,7 @@ namespace Orders {
             let (prev_id) = locate_previous_item(head, [empty_order], old_tail.order_id);
             let (new_tail) = IStorageContract.get_order(storage_addr, prev_id);
             tempvar new_tail_updated: Order* = new Order(
-                order_id=new_tail.order_id, next_id=0, is_buy=new_tail.is_buy, price=new_tail.price, amount=new_tail.amount, 
+                order_id=new_tail.order_id, next_id=0, is_bid=new_tail.is_bid, price=new_tail.price, amount=new_tail.amount, 
                 filled=new_tail.filled, datetime=new_tail.datetime, owner=new_tail.owner, limit_id=new_tail.limit_id
             );
             IStorageContract.set_order(storage_addr, new_tail.order_id, [new_tail_updated]);
@@ -206,7 +206,7 @@ namespace Orders {
         let is_positive = is_le(1, filled);
         if (is_valid + is_incremental + is_positive == 3) {
             tempvar new_order : Order* = new Order(
-                order_id=order.order_id, next_id=order.next_id, is_buy=order.is_buy, price=order.price, amount=order.amount,
+                order_id=order.order_id, next_id=order.next_id, is_bid=order.is_bid, price=order.price, amount=order.amount,
                 filled=filled, datetime=order.datetime, owner=order.owner, limit_id=order.limit_id
             );
             IStorageContract.set_order(storage_addr, order.order_id, [new_order]);
@@ -250,14 +250,14 @@ namespace Orders {
         let (prev_id) = locate_previous_item(head, [empty_order], order_id);
         let (removed_prev) = IStorageContract.get_order(storage_addr, prev_id);
         tempvar updated_removed_prev: Order* = new Order(
-            order_id=removed_prev.order_id, next_id=removed.next_id, is_buy=removed_prev.is_buy, price=removed_prev.price, amount=removed_prev.amount, 
+            order_id=removed_prev.order_id, next_id=removed.next_id, is_bid=removed_prev.is_bid, price=removed_prev.price, amount=removed_prev.amount, 
             filled=removed_prev.filled, datetime=removed_prev.datetime, owner=removed_prev.owner, limit_id=removed_prev.limit_id
         ); 
         IStorageContract.set_order(storage_addr, removed_prev.order_id, [updated_removed_prev]);
 
         let (removed_next) = IStorageContract.get_order(storage_addr, removed.next_id);
         tempvar updated_removed_next: Order* = new Order(
-            order_id=removed_next.order_id, next_id=removed_next.next_id, is_buy=removed_next.is_buy, price=removed_next.price, amount=removed_next.amount,
+            order_id=removed_next.order_id, next_id=removed_next.next_id, is_bid=removed_next.is_bid, price=removed_next.price, amount=removed_next.amount,
             filled=removed_next.filled, datetime=removed_next.datetime, owner=removed_next.owner, limit_id=removed_next.limit_id
         ); 
         IStorageContract.set_order(storage_addr, removed_next.order_id, [updated_removed_next]);
@@ -344,7 +344,7 @@ namespace Orders {
     // Utility function to generate an empty order.
     func gen_empty_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_order : Order*) {
         tempvar empty_order: Order* = new Order(
-            order_id=0, next_id=0, is_buy=0, price=0, amount=0, filled=0, datetime=0, owner=0, limit_id=0
+            order_id=0, next_id=0, is_bid=0, price=0, amount=0, filled=0, datetime=0, owner=0, limit_id=0
         );
         return (empty_order=empty_order);
     }

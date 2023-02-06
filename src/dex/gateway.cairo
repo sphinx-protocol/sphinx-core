@@ -512,15 +512,15 @@ func get_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // Fetches quote for market order based on current order book.
 // @param base_asset : felt representation of ERC20 base asset contract address
 // @param quote_asset : felt representation of ERC20 quote asset contract address
-// @param is_buy : 1 for market buy order, 0 for market sell order
+// @param is_bid : 1 for market buy order, 0 for market sell order
 // @param amount : size of order in terms of quote asset
 // @return price : quote price
 // @return base_amount : order amount in terms of base asset
 // @return quote_amount : order amount in terms of quote asset
 @view
 func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt, is_buy : felt, amount : felt
+    base_asset : felt, quote_asset : felt, is_bid : felt, amount : felt
 ) -> (price : felt, base_amount : felt, quote_amount : felt) {
-    let (price, base_amount, quote_amount) = Markets.fetch_quote(base_asset, quote_asset, is_buy, amount);
+    let (price, base_amount, quote_amount) = Markets.fetch_quote(base_asset, quote_asset, is_bid, amount);
     return (price=price, base_amount=base_amount, quote_amount=quote_amount);
 }
