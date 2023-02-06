@@ -17,7 +17,7 @@ func test_bitpacking{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check
         filled=1,
         owner_id=235,
         limit_id=777,
-        is_buy=1,
+        is_bid=1,
     );
 
     let (order_slab0, order_slab1) = pack_order(order=order);
