@@ -69,31 +69,29 @@ namespace Balances {
     // @param recipient : recipient EOA
     // @param asset : felt representation of ERC20 token contract address
     // @param amount : token balance
-    // @return success : 1 if successful, 0 otherwise
     func transfer_balance{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         sender : felt, recipient : felt, asset : felt, amount : felt
-    ) -> (success : felt) {
+    ) {
         alloc_locals;
         let (sender_balance) = get_balance(sender, asset, 1);
         let is_sufficient = is_le(amount, sender_balance);
         let is_positive = is_le(1, amount);
-        with_attr error_message("[Balances] transfer_balance > Balance must be sufficient and positive, sender balance is {sender_balance} but requested transfer of {amount}") {
+        with_attr error_message("[Balances] transfer_balance > Balance is {sender_balance} but requested transfer of {amount}") {
             assert is_sufficient + is_positive = 2;
         }
         let (recipient_balance) = get_balance(recipient, asset, 1);
         set_balance(sender, asset, 1, sender_balance - amount);
         set_balance(recipient, asset, 1, recipient_balance + amount);
-        return (success=1);
+        return ();
     }
 
     // Transfer account balance to order balance.
     // @param user : User EOA
     // @param asset : felt representation of ERC20 token contract address
     // @param amount : balance to transfer to open order
-    // @return success : 1 if successful, 0 otherwise
     func transfer_to_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, amount : felt
-    ) -> (success : felt) {
+    ) {
         alloc_locals;
         let (balance) = get_balance(user, asset, 1);
         let is_sufficient = is_le(amount, balance);
@@ -104,9 +102,12 @@ namespace Balances {
             set_balance(user, asset, 0, locked_balance + amount);
             let (user_account_balance) = get_balance(user, asset, 1);
             let (user_locked_balance) = get_balance(user, asset, 0);        
-            return (success=1);
+            return ();
         } else {
-            return (success=0);
+            with_attr error_message("[Balances] transfer_to_order > Balance is {balance} but requested transfer of {amount}") {
+                assert is_sufficient + is_positive = 2;
+            }
+            return ();
         }   
     }
 
@@ -114,10 +115,9 @@ namespace Balances {
     // @param user : User EOA
     // @param asset : felt representation of ERC20 token contract address
     // @param amount : balance to transfer from open order to account balance
-    // @return success : 1 if successful, 0 otherwise
     func transfer_from_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         user : felt, asset : felt, amount : felt
-    ) -> (success : felt) {
+    ) {
         alloc_locals;
         let (locked_balance) = get_balance(user, asset, 0);
         let is_sufficient = is_le(amount, locked_balance);
@@ -128,9 +128,12 @@ namespace Balances {
             set_balance(user, asset, 1, balance + amount);
             let (user_account_balance) = get_balance(user, asset, 1);
             let (user_locked_balance) = get_balance(user, asset, 0);
-            return (success=1);
+            return ();
         } else {
-            return (success=0);
+            with_attr error_message("[Balances] transfer_from_order > Open order balance is {locked_balance} but requested transfer of {amount}") {
+                assert is_sufficient + is_positive = 2;
+            }
+            return ();
         }   
     }
 }

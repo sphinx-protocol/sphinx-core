@@ -31,6 +31,12 @@ namespace IStorageContract {
     // Set latest limit id
     func set_curr_limit_id(new_id : felt) {
     }
+    // Get order by order ID
+    func get_order(order_id : felt) -> (order : Order) {
+    }
+    // Get head order by limit ID
+    func get_head(limit_id : felt) -> (order_id : felt) {
+    }
 }
 
 namespace Limits {
@@ -39,75 +45,37 @@ namespace Limits {
     // Functions
     //
 
-    // Getter for limit price
-    func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit_id : felt) -> (limit : Limit) {
-        let (storage_addr) = Orders.get_storage_address();
-        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
-        return (limit=limit);
-    }
-
-    // Getter for lowest limit price in the tree
-    // @param tree_id : ID of limit tree to be searched
-    // @return min : node representation of lowest limit price in the tree
-    func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (min : Limit) {
-        alloc_locals;
-        let empty_limit : Limit* = gen_empty_limit();
-        let (storage_addr) = Orders.get_storage_address();
-        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
-        if (root_id == 0) {
-            return (min=[empty_limit]);
-        }
-        let (root) = IStorageContract.get_limit(storage_addr, root_id);
-        let (min, _) = find_min(root, [empty_limit]);
-        return (min=min);
-    }
-
-    // Getter for highest limit price in the tree
-    // @param tree_id : ID of limit tree to be searched
-    // @return max : node representation of highest limit price in the tree
-    func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (max : Limit) {
-        alloc_locals;
-        let (storage_addr) = Orders.get_storage_address();
-        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
-        let empty_limit: Limit* = gen_empty_limit();
-        if (root_id == 0) {
-            return (max=[empty_limit]);
-        }
-        let (root) = IStorageContract.get_limit(storage_addr, root_id);
-        let (max) = find_max(curr=root);
-        return (max=max);
-    }
-
     // Insert new limit price into BST.
     // @param price : new limit price to be inserted
     // @param tree_id : ID of tree currently being traversed
-    // @param tree_id : ID of current market
-    // @return success : 1 if insertion was successful, 0 otherwise
+    // @param market_id : ID of current market
+    // @return new_limit : new limit price inserted
     func insert{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         price : felt, tree_id : felt, market_id : felt
     ) -> (new_limit : Limit) {
         alloc_locals;
         
         let (storage_addr) = Orders.get_storage_address();
+
         let (id) = IStorageContract.get_curr_limit_id(storage_addr);
         tempvar new_limit: Limit* = new Limit(
-            id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=tree_id, market_id=market_id
+            limit_id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, tree_id=tree_id, market_id=market_id
         );
         IStorageContract.set_limit(storage_addr, id, [new_limit]);
         IStorageContract.set_curr_limit_id(storage_addr, id + 1);
         
         let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
         if (root_id == 0) {
-            IStorageContract.set_root(storage_addr, tree_id, new_limit.id);
+            IStorageContract.set_root(storage_addr, tree_id, new_limit.limit_id);
 
             // Diagnostics
-            // let (new_root) = IStorageContract.get_limit(storage_addr, new_limit.id);
+            // let (new_root) = IStorageContract.get_limit(storage_addr, new_limit.limit_id);
             // print_limit_tree(new_root, 1);
 
             return (new_limit=[new_limit]);
         }
         let (root) = IStorageContract.get_limit(storage_addr, root_id);
-        let (inserted) = insert_helper(price, root, new_limit.id, tree_id, market_id);
+        let (inserted) = insert_helper(price, root, new_limit.limit_id, tree_id, market_id);
 
         // Diagnostics
         // let (new_root) = IStorageContract.get_limit(storage_addr, root_id);
@@ -122,7 +90,7 @@ namespace Limits {
     // @param new_limit_id : id of new node to be inserted into the BST
     // @param tree_id : ID of tree currently being traversed
     // @param market_id : ID of current market
-    // @return success : 1 if insertion was successful, 0 otherwise
+    // @return new_limit : new limit price inserted
     func insert_helper{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         price : felt, curr : Limit, new_limit_id : felt, tree_id : felt, market_id : felt
     ) -> (new_limit : Limit) {
@@ -137,10 +105,10 @@ namespace Limits {
         if (greater_than == 1) {
             if (curr.right_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
-                    id=curr.id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, total_vol=curr.total_vol, 
-                    length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
+                    limit_id=curr.limit_id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, 
+                    total_vol=curr.total_vol, length=curr.length, tree_id=tree_id, market_id=curr.market_id
                 );
-                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
                 let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
@@ -156,10 +124,10 @@ namespace Limits {
         if (less_than == 1) {
             if (curr.left_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
-                    id=curr.id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price, total_vol=curr.total_vol, 
-                    length=curr.length, head_id=curr.head_id, tail_id=curr.tail_id, tree_id=tree_id, market_id=curr.market_id
+                    limit_id=curr.limit_id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price,  
+                    total_vol=curr.total_vol, length=curr.length, tree_id=tree_id, market_id=curr.market_id
                 );
-                IStorageContract.set_limit(storage_addr, curr.id, [new_curr]);
+                IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
                 let (new_limit) = IStorageContract.get_limit(storage_addr, new_limit_id);
                 return (new_limit=new_limit);
@@ -208,7 +176,7 @@ namespace Limits {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        if (curr.id == 0) {
+        if (curr.limit_id == 0) {
             let empty_limit: Limit* = gen_empty_limit();
             handle_revoked_refs();
             return (limit=[empty_limit], parent=[empty_limit]);
@@ -258,7 +226,7 @@ namespace Limits {
         }
 
         let (limit, parent) = find(price, tree_id);
-        if (limit.id == 0) {
+        if (limit.limit_id == 0) {
             return (del=[empty_limit]);
         }
 
@@ -276,13 +244,13 @@ namespace Limits {
                 handle_revoked_refs();
             } else {
                 let (right) = IStorageContract.get_limit(storage_addr, limit.right_id);
-                let (successor, successor_parent) = find_min(right, limit);
+                let (successor, successor_parent) = get_min_child(right, limit);
 
-                update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=successor.id);
-                if (limit.left_id == successor.id) {                
+                update_parent(tree_id=tree_id, parent=parent, limit=limit, new_id=successor.limit_id);
+                if (limit.left_id == successor.limit_id) {                
                     update_pointers(successor, 0, limit.right_id);
                 } else {
-                    if (limit.right_id == successor.id) {
+                    if (limit.right_id == successor.limit_id) {
                         update_pointers(successor, limit.left_id, 0);                    
                     } else {
                         update_pointers(successor, limit.left_id, limit.right_id);
@@ -300,6 +268,60 @@ namespace Limits {
         return (del=limit);
     }
 
+    // Getter for lowest limit price in the tree
+    // @param tree_id : ID of limit tree to be searched
+    // @return min : node representation of lowest limit price in the tree
+    func get_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (min : Limit) {
+        alloc_locals;
+        let empty_limit : Limit* = gen_empty_limit();
+        let (storage_addr) = Orders.get_storage_address();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        if (root_id == 0) {
+            return (min=[empty_limit]);
+        }
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
+        let (min, _) = get_min_child(root, [empty_limit]);
+        return (min=min);
+    }
+
+    // Getter for highest limit price in the tree
+    // @param tree_id : ID of limit tree to be searched
+    // @return max : node representation of highest limit price in the tree
+    func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (tree_id : felt) -> (max : Limit) {
+        alloc_locals;
+        let (storage_addr) = Orders.get_storage_address();
+        let (root_id) = IStorageContract.get_root(storage_addr, tree_id);
+        let empty_limit: Limit* = gen_empty_limit();
+        if (root_id == 0) {
+            return (max=[empty_limit]);
+        }
+        let (root) = IStorageContract.get_limit(storage_addr, root_id);
+        let (max) = get_max_child(curr=root);
+        return (max=max);
+    }
+
+    // Setter function to update details of limit price
+    // @param limit : ID of limit price to update
+    // @param new_vol : new volume
+    func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+        limit_id : felt, total_vol : felt, length : felt
+    ) {
+        if (limit_id == 0) {
+            with_attr error_message("Limit does not exist") {
+                assert 1 = 0;
+            } 
+            return ();
+        }
+        let (storage_addr) = Orders.get_storage_address();
+        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
+        tempvar new_limit: Limit* = new Limit(
+            limit_id=limit.limit_id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, 
+            total_vol=total_vol, length=length, tree_id=limit.tree_id, market_id=limit.market_id
+        );
+        IStorageContract.set_limit(storage_addr, limit_id, [new_limit]);
+        return ();
+    }
+
     // Helper function to update left or right child of parent.
     // @param tree_id : ID of tree currently being traversed
     // @param parent : parent node to update
@@ -311,14 +333,14 @@ namespace Limits {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        if (parent.id == 0) {
+        if (parent.limit_id == 0) {
             IStorageContract.set_root(storage_addr, tree_id, new_id);
             handle_revoked_refs();
         } else {
             handle_revoked_refs();
         }
 
-        if (parent.left_id == limit.id) {
+        if (parent.left_id == limit.limit_id) {
             update_pointers(parent, new_id, parent.right_id);
         } else {
             update_pointers(parent, parent.left_id, new_id);
@@ -335,11 +357,11 @@ namespace Limits {
         node : Limit, left_id : felt, right_id : felt
     ) {
         tempvar new_node: Limit* = new Limit(
-            id=node.id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
-            length=node.length, head_id=node.head_id, tail_id=node.tail_id, tree_id=node.tree_id, market_id=node.market_id
+            limit_id=node.limit_id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
+            length=node.length, tree_id=node.tree_id, market_id=node.market_id
         );
         let (storage_addr) = Orders.get_storage_address();
-        IStorageContract.set_limit(storage_addr, node.id, [new_node]);
+        IStorageContract.set_limit(storage_addr, node.limit_id, [new_node]);
         handle_revoked_refs();
         return ();
     }
@@ -349,7 +371,7 @@ namespace Limits {
     // @param parent : parent node of root
     // @return min : node representation of lowest limit price
     // @return parent : parent node of lowest limit price
-    func find_min{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    func get_min_child{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         curr : Limit, parent : Limit
     ) -> (min : Limit, parent : Limit) {
         if (curr.left_id == 0) {
@@ -357,50 +379,30 @@ namespace Limits {
         }
         let (storage_addr) = Orders.get_storage_address();
         let (left) = IStorageContract.get_limit(storage_addr, curr.left_id);
-        return find_min(curr=left, parent=curr);
+        return get_min_child(curr=left, parent=curr);
     }
 
     // Helper function to find the highest limit price within a tree
     // @param root : root of tree to be searched
     // @return min : node representation of highest limit price
-    func find_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (curr : Limit) -> (max : Limit) {
+    func get_max_child{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (curr : Limit) -> (max : Limit) {
         if (curr.right_id == 0) {
             return (max=curr);
         }
         let (storage_addr) = Orders.get_storage_address();
         let (right) = IStorageContract.get_limit(storage_addr, curr.right_id);
-        return find_max(curr=right);
-    }
-
-    // Setter function to update details of limit price
-    // @param limit : ID of limit price to update
-    // @param new_vol : new volume
-    // @return success : 1 if successfully inserted, 0 otherwise
-    func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        limit_id : felt, total_vol : felt, length : felt, head_id : felt, tail_id : felt) -> (success : felt
-    ) {
-        if (limit_id == 0) {
-            return (success=0);
-        }
-        let (storage_addr) = Orders.get_storage_address();
-        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
-        tempvar new_limit: Limit* = new Limit(
-            id=limit.id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, total_vol=total_vol, 
-            length=length, head_id=head_id, tail_id=tail_id, tree_id=limit.tree_id, market_id=limit.market_id
-        );
-        IStorageContract.set_limit(storage_addr, limit_id, [new_limit]);
-        return (success=1);
+        return get_max_child(curr=right);
     }
 
     // Helper function to generate an empty limit struct.
     func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_limit : Limit*) {
         tempvar empty_limit: Limit* = new Limit(
-            id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, head_id=0, tail_id=0, tree_id=0, market_id=0
+            limit_id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, tree_id=0, market_id=0
         );
         return (empty_limit=empty_limit);
     }
 
-    // Utility function to return all limit prices and volumes in a limit tree, from left to right order.
+    // Return all limit prices and volumes in a limit tree, from left to right order.
     // @param tree_id : ID of tree to be viewed
     // @return prices : array of limit prices
     // @return amounts : array of order volumes at each limit price
@@ -541,7 +543,8 @@ namespace Limits {
         let (storage_addr) = Orders.get_storage_address();
         let (new_idx) = traverse_left_branch_orders(node=node, idx=idx);
         
-        let (head_order) = Orders.get_order(node.head_id);
+        let (head_order_id) = IStorageContract.get_head(storage_addr, node.limit_id);
+        let (head_order) = IStorageContract.get_order(storage_addr, head_order_id);
         let (new_idx_2) = array_append_orders{prices=prices, amounts=amounts, owners=owners, ids=ids}(order=head_order, idx=new_idx);
 
         let (new_idx_3) = traverse_right_branch_orders(node=node, idx=new_idx_2);
@@ -612,7 +615,11 @@ namespace Limits {
         owners : felt*, 
         ids : felt*
     } (order : Order, idx: felt) -> (new_idx : felt) {
-        if (order.id == 0) {
+        alloc_locals;
+        
+        let (storage_addr) = Orders.get_storage_address();
+        
+        if (order.order_id == 0) {
             handle_revoked_refs_alt_2();
             return (new_idx=idx);
         } else {
@@ -622,13 +629,13 @@ namespace Limits {
         assert prices[idx] = order.price;
         assert amounts[idx] = order.amount;
         assert owners[idx] = order.owner;
-        assert ids[idx] = order.id;
+        assert ids[idx] = order.order_id;
 
         if (order.next_id == 0) {
             handle_revoked_refs_alt_2();
             return (new_idx=idx + 1);
         } else {
-            let (next_order) = Orders.get_order(order.next_id);
+            let (next_order) = IStorageContract.get_order(storage_addr, order.next_id);
             let (new_idx) = array_append_orders(next_order, idx+1);
             return (new_idx=new_idx);
         }
