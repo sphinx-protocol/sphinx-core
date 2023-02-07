@@ -69,6 +69,14 @@ func curr_market_id() -> (market_id : felt) {
 @storage_var
 func curr_tree_id() -> (tree_id : felt) {
 }
+// Stores decimals of base asset for each market.
+@storage_var
+func base_decimals(market_id : felt) -> (decimals : felt) {
+}
+// Stores decimals of quote asset for each market.
+@storage_var
+func quote_decimals(market_id : felt) -> (decimals : felt) {
+}
 
 // Stores user balances.
 @storage_var
@@ -330,6 +338,42 @@ func set_curr_tree_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 ) {
     assert_only_gateway();
     curr_tree_id.write(new_tree_id);
+    return ();
+}
+
+@view
+func get_base_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    market_id : felt) -> (decimals : felt
+) {
+    assert_gateway_or_owner();
+    let (decimals) = base_decimals.read(market_id);
+    return (decimals=decimals);
+}
+
+@external
+func set_base_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    market_id : felt, decimals : felt
+) {
+    assert_only_gateway();
+    base_decimals.write(market_id, decimals);
+    return ();
+}
+
+@view
+func get_quote_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    market_id : felt) -> (decimals : felt
+) {
+    assert_gateway_or_owner();
+    let (decimals) = quote_decimals.read(market_id);
+    return (decimals=decimals);
+}
+
+@external
+func set_quote_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
+    market_id : felt, decimals : felt
+) {
+    assert_only_gateway();
+    quote_decimals.write(market_id, decimals);
     return ();
 }
 

@@ -5,7 +5,6 @@ from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from starkware.starknet.common.syscalls import get_caller_address
 from src.dex.orders import Orders
-from src.utils.handle_revoked_refs import handle_revoked_refs
 
 @contract_interface
 namespace IStorageContract {
