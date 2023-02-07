@@ -24,9 +24,9 @@ func constructor{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 
 @external
 func create_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    base_asset : felt, quote_asset : felt
+    base_asset : felt, quote_asset : felt, base_asset_decimals : felt, quote_asset_decimals : felt
 ) -> (new_market : Market) {
-    let (new_market) = Markets.create_market(base_asset, quote_asset);
+    let (new_market) = Markets.create_market(base_asset, quote_asset, base_asset_decimals, quote_asset_decimals);
     return (new_market=new_market);
 }
 

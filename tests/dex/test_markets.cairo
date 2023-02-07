@@ -19,7 +19,7 @@ const N15 = 1000000000000000;
 @contract_interface
 namespace IMarketsContract {
     // Create a new market for exchanging between two assets.
-    func create_market(base_asset : felt, quote_asset : felt) -> (new_market : Market) {
+    func create_market(base_asset : felt, quote_asset : felt, base_asset_decimals : felt, quote_asset_decimals : felt) -> (new_market : Market) {
     }
     // Get market IDs from base and quote asset addresses.
     func get_market_id(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
@@ -120,7 +120,7 @@ func test_markets{
     %{ stop_prank_callable = start_prank(ids.gateway_addr, target_contract_address=ids.storage_addr) %}
 
     // Test 1 : Should create new market
-    let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset);
+    let (new_market) = IMarketsContract.create_market(markets_addr, base_asset, quote_asset, 18, 18);
     assert new_market.market_id = 1;
     assert new_market.bid_tree_id = 1;
     assert new_market.ask_tree_id = 2;
@@ -135,7 +135,6 @@ func test_markets{
     // IMarketsContract.create_market(markets_addr, base_asset, base_asset);
 
     // Test 4 : Should fetch market IDs
-    IMarketsContract.create_market(markets_addr, 712317239, 41823823);
     let (market_id) = IMarketsContract.get_market_id(markets_addr, base_asset, quote_asset);
     let (market_id_reverse) = IMarketsContract.get_market_id(markets_addr, quote_asset, base_asset);
     assert market_id = 1;

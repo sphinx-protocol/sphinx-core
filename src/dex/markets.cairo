@@ -51,6 +51,7 @@ namespace IStorageContract {
     }
     // Get limit by limit ID
     func get_limit(limit_id : felt) -> (limit : Limit) {
+    }
     // Get base asset decimals
     func get_base_decimals(market_id : felt) -> (decimals : felt) {
     }
@@ -227,10 +228,10 @@ namespace Markets {
         alloc_locals;
 
         let (storage_addr) = Orders.get_storage_address();
-        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
-        let (base_amount, _) = unsigned_div_rem(amount * price, denominator);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * price, denominator);
 
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         let balance_sufficient = is_le(base_amount, account_balance);
@@ -259,7 +260,7 @@ namespace Markets {
             handle_revoked_refs();
         }
 
-        let (order_size_in_base, _) = unsigned_div_rem(amount * price, denominator);
+        let (order_size_in_base, _) = unsigned_div_rem(quote_amount * price, denominator);
         Balances.transfer_to_order(caller, market.base_asset, order_size_in_base);
 
         log_create_bid.emit(
@@ -396,9 +397,9 @@ namespace Markets {
             assert lowest_ask_exists = 1;
         }
         
-        let (lowest_ask) = Orders.get_order(market.lowest_ask);
-        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (lowest_ask) = IStorageContract.get_order(storage_addr, market.lowest_ask);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
         let (base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
@@ -483,8 +484,8 @@ namespace Markets {
         }
 
         let (highest_bid) = IStorageContract.get_order(storage_addr, market.highest_bid);
-        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
         let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
@@ -521,20 +522,19 @@ namespace Markets {
             Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, base_amount);
             Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
 
-            log_bid_taken.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=highest_bid.amount, total_filled=highest_bid.filled+quote_amount);
-            log_sell_filled.emit(order_id=highest_bid.order_id, limit_id=limit.limit_id, market_id=market.market_id, datetime=datetime, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, quote_amount=quote_amount, total_filled=filled+quote_amount);
+            log_bid_taken.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, highest_bid.owner, caller, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount, highest_bid.filled+quote_amount);
+            log_sell_filled.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.price, quote_amount, filled+quote_amount);
             handle_revoked_refs();
 
             return ();
         } else {
             // Fill entire order
             delete(highest_bid.order_id);
-            Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, quote_amount);
+            Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, highest_bid.amount - highest_bid.filled);
             let (price_units) = pow(10, 18);
             let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, price_units);
-
-            log_bid_taken.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, owner=highest_bid.owner, seller=caller, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount, total_filled=highest_bid.amount);
-            log_sell_filled.emit(id=highest_bid.id, limit_id=limit.id, market_id=market.id, dt=dt, seller=caller, buyer=highest_bid.owner, base_asset=market.base_asset, quote_asset=market.quote_asset, price=highest_bid.price, amount=highest_bid.amount-highest_bid.filled, total_filled=filled+highest_bid.amount-highest_bid.filled);
+            Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, updated_base_amount);
+            Orders.set_filled(highest_bid.order_id, highest_bid.amount);
 
             log_bid_taken.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, highest_bid.owner, caller, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount, highest_bid.amount);
             log_sell_filled.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount-highest_bid.filled, filled+highest_bid.amount-highest_bid.filled);
@@ -568,8 +568,8 @@ namespace Markets {
         let (market) = IStorageContract.get_market(storage_addr, limit.market_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, order.limit_id);
 
-        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.id);
-        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.id);
+        let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
+        let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
 
         if (order.is_bid == 1) {
@@ -625,7 +625,6 @@ namespace Markets {
     // @return price : quote price
     // @return base_amount : order amount in terms of base asset
     // @return quote_amount : order amount in terms of quote asset
-    @view
     func fetch_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
         base_asset : felt, quote_asset : felt, is_bid : felt, amount : felt
     ) -> (price : felt, base_amount : felt, quote_amount : felt) {

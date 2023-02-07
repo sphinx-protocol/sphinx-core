@@ -345,7 +345,6 @@ func set_curr_tree_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 func get_base_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt) -> (decimals : felt
 ) {
-    assert_gateway_or_owner();
     let (decimals) = base_decimals.read(market_id);
     return (decimals=decimals);
 }
@@ -363,7 +362,6 @@ func set_base_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_quote_decimals{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt) -> (decimals : felt
 ) {
-    assert_gateway_or_owner();
     let (decimals) = quote_decimals.read(market_id);
     return (decimals=decimals);
 }
