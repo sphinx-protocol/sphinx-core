@@ -72,42 +72,41 @@ namespace Orders {
 
     // Insert new order to the end of the list.
     // @param is_bid : 1 if buy order, 0 if sell order
-    // @param price : limit price
     // @param amount : amount of order
-    // @param datetime : datetime of order entry
-    // @param owner : owner of order
+    // @param owner_id : owner of order
     // @param limit_id : ID of limit price corresponding to order
+    // @return new_order : new order
     func push{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        is_bid : felt, price : felt, amount : felt, datetime : felt, owner : felt, limit_id : felt
+        is_bid : felt, amount : felt, owner_id : felt, limit_id : felt
     ) -> (new_order : Order) {
         alloc_locals;
 
         let (storage_addr) = get_storage_address();
-        let (id) = IStorageContract.get_curr_order_id(storage_addr);
+        let (order_id) = IStorageContract.get_curr_order_id(storage_addr);
         tempvar new_order: Order* = new Order(
-            order_id=id, next_id=0, is_bid=is_bid, price=price, amount=amount, filled=0, datetime=datetime, owner=owner, limit_id=limit_id
+            order_id=order_id, next_id=0, is_bid=is_bid, amount=amount, owner_id=owner_id, limit_id=limit_id
         );
-        IStorageContract.set_order(storage_addr, id, [new_order]);
+        IStorageContract.set_order(storage_addr, order_id, [new_order]);
         IStorageContract.set_curr_order_id(storage_addr, id + 1);
 
-        let (length) = IStorageContract.get_length(storage_addr, limit_id);
-        IStorageContract.set_length(storage_addr, limit_id, length + 1);
-        if (length == 0) {
+        let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
+        IStorageContract.set_length(storage_addr, limit_id, limit.length + 1);
+        if (limit.length == 0) {
             IStorageContract.set_head(storage_addr, limit_id, new_order.order_id);
             handle_revoked_refs();
             return (new_order=[new_order]);
         } else {
             let (head_id) = IStorageContract.get_head(storage_addr, limit_id);
             let (head) = IStorageContract.get_order(storage_addr, head_id);
-            let (old_tail) = locate_item_from_head(0, length - 1, head);
+            let (old_tail) = locate_item_from_head(0, limit.length - 1, head);
             tempvar old_tail_updated: Order* = new Order(
-                order_id=old_tail.order_id, next_id=new_order.order_id, is_bid=old_tail.is_bid, price=old_tail.price, amount=old_tail.amount, 
-                filled=old_tail.filled, datetime=old_tail.datetime, owner=old_tail.owner, limit_id=old_tail.limit_id
+                order_id=old_tail.order_id, next_id=new_order.order_id, is_bid=old_tail.is_bid, amount=old_tail.amount, 
+                owner_id=old_tail.owner_id, limit_id=old_tail.limit_id
             );
             IStorageContract.set_order(storage_addr, old_tail.order_id, [old_tail_updated]);
             tempvar new_tail: Order* = new Order(
-                order_id=new_order.order_id, next_id=0, is_bid=new_order.is_bid, price=new_order.price, amount=new_order.amount, 
-                filled=new_order.filled, datetime=new_order.datetime, owner=new_order.owner, limit_id=new_order.limit_id
+                order_id=new_order.order_id, next_id=0, is_bid=new_order.is_bid, amount=new_order.amount, 
+                owner_id=new_order.owner_id, limit_id=new_order.limit_id
             );
             IStorageContract.set_order(storage_addr, new_order.order_id, [new_tail]);
             handle_revoked_refs();

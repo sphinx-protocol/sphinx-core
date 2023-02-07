@@ -85,7 +85,7 @@ func print_limit_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
     %{ 
         print("    ", end="")
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.length, ids.root.head_id, ids.root.tail_id, ids.root.tree_id, ids.root.market_id))
+        print("id: {}, left_id: {}, right_id: {}, price: {}, amount: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}, market_id: {}".format(ids.root.id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.amount, ids.root.length, ids.root.head_id, ids.root.tail_id, ids.root.tree_id, ids.root.market_id))
     %}
     if (right_exists == 1) {
         let (right) = limits.read(root.right_id);
@@ -101,7 +101,7 @@ func print_limit_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
 @view
 func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.length, ids.limit.head_id, ids.limit.tail_id, ids.limit.tree_id, ids.limit.market_id)) 
+        print("id: {}, left_id: {}, right_id: {}, price: {}, amount: {}, length: {}, head_id: {}, tail_id: {}, tree_id: {}".format(ids.limit.id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.amount, ids.limit.length, ids.limit.head_id, ids.limit.tail_id, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }
@@ -109,7 +109,7 @@ func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // Utility function to print information about a market.
 func print_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (market : Market) {
     %{ 
-        print("id: {}, bid_tree_id: {}, ask_tree_id: {}, lowest_ask: {}, highest_bid: {}, base_asset: {}, quote_asset: {}, controller: {}".format(ids.market.id, ids.market.bid_tree_id, ids.market.ask_tree_id, ids.market.lowest_ask, ids.market.highest_bid, ids.market.base_asset, ids.market.quote_asset, ids.market.controller)) 
+        print("id: {}, bid_tree_id: {}, ask_tree_id: {}, lowest_ask_id: {}, highest_bid_id: {}, base_asset: {}, quote_asset: {}, controller: {}".format(ids.market.id, ids.market.bid_tree_id, ids.market.ask_tree_id, ids.market.lowest_ask_id, ids.market.highest_bid_id, ids.market.base_asset, ids.market.quote_asset, ids.market.controller)) 
     %}
     return ();
 }

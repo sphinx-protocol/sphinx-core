@@ -233,8 +233,8 @@ func test_markets{
     // Test 17 : Should be able to cancel order
     IMarketsContract.delete(markets_addr, 11);
     let (updated_market) = IStorageContract.get_market(storage_addr, market_id);
-    let (lowest_ask) = IStorageContract.get_order(storage_addr, updated_market.lowest_ask);
-    assert lowest_ask.price = 1000 * N18;
+    let (lowest_ask_id) = IStorageContract.get_order(storage_addr, updated_market.lowest_ask_id);
+    assert lowest_ask_id.price = 1000 * N18;
 
     // TODO: Test emit events
 
@@ -255,7 +255,7 @@ func print_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr
 // Utility function to handle printing info about a limit price.
 func print_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (limit : Limit) {
     %{ 
-        print("limit_id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, tree_id: {}".format(ids.limit.limit_id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.total_vol, ids.limit.length, ids.limit.tree_id, ids.limit.market_id)) 
+        print("limit_id: {}, left_id: {}, right_id: {}, price: {}, amount: {}, length: {}, tree_id: {}".format(ids.limit.limit_id, ids.limit.left_id, ids.limit.right_id, ids.limit.price, ids.limit.amount, ids.limit.length, ids.limit.tree_id, ids.limit.market_id)) 
     %}
     return ();
 }
@@ -309,7 +309,7 @@ func print_limit_tree{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_chec
     }
     %{ 
         print("    ", end="")
-        print("id: {}, left_id: {}, right_id: {}, price: {}, total_vol: {}, length: {}, tree_id: {}, market_id: {}".format(ids.root.limit_id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.total_vol, ids.root.length, ids.root.tree_id, ids.root.market_id))
+        print("id: {}, left_id: {}, right_id: {}, price: {}, amount: {}, length: {}, tree_id: {}, market_id: {}".format(ids.root.limit_id, ids.root.left_id, ids.root.right_id, ids.root.price, ids.root.amount, ids.root.length, ids.root.tree_id, ids.root.market_id))
     %}
     if (right_exists == 1) {
         let (right) = IStorageContract.get_limit(storage_addr, root.right_id);

@@ -40,9 +40,9 @@ func get_market_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_p
 
 @external
 func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    market_id : felt, lowest_ask : felt, highest_bid : felt
+    market_id : felt, lowest_ask_id : felt, highest_bid_id : felt
 ) {
-    Markets.update_inside_quote(market_id, lowest_ask, highest_bid);
+    Markets.update_inside_quote(market_id, lowest_ask_id, highest_bid_id);
     return ();
 }
 

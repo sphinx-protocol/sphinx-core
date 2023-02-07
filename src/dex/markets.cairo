@@ -114,7 +114,7 @@ namespace Markets {
         let (tree_id) = IStorageContract.get_curr_tree_id(storage_addr);
 
         tempvar new_market: Market* = new Market(
-            market_id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
+            market_id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask_id=0, highest_bid_id=0, 
             base_asset=base_asset, quote_asset=quote_asset
         );
         IStorageContract.set_market(storage_addr, market_id, [new_market]);
@@ -127,7 +127,7 @@ namespace Markets {
         IStorageContract.set_quote_decimals(storage_addr, market_id, quote_decimals);
 
         log_create_market.emit(
-            market_id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask=0, highest_bid=0, 
+            market_id=market_id, bid_tree_id=tree_id, ask_tree_id=tree_id+1, lowest_ask_id=0, highest_bid_id=0, 
             base_asset=base_asset, quote_asset=quote_asset
         );
 
@@ -136,10 +136,10 @@ namespace Markets {
 
     // Update inside quote of market.
     // @param market_id : market ID
-    // @param lowest_ask : ID of lowest ask of market
-    // @param highest_bid : ID of highest bid of market
+    // @param lowest_ask_id : ID of lowest ask of market
+    // @param highest_bid_id : ID of highest bid of market
     func update_inside_quote{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        market_id : felt, lowest_ask : felt, highest_bid : felt
+        market_id : felt, lowest_ask_id : felt, highest_bid_id : felt
     ) {
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
@@ -150,8 +150,8 @@ namespace Markets {
             return ();
         }
         tempvar new_market: Market* = new Market(
-            market_id=market_id, bid_tree_id=market.bid_tree_id, ask_tree_id=market.ask_tree_id, lowest_ask=lowest_ask, 
-            highest_bid=highest_bid, base_asset=market.base_asset, quote_asset=market.quote_asset
+            market_id=market_id, bid_tree_id=market.bid_tree_id, ask_tree_id=market.ask_tree_id, lowest_ask_id=lowest_ask_id, 
+            highest_bid_id=highest_bid_id, base_asset=market.base_asset, quote_asset=market.quote_asset
         );
         IStorageContract.set_market(storage_addr, market_id, [new_market]);
         return ();
@@ -171,7 +171,7 @@ namespace Markets {
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (limit, _) = Limits.find(price, market.bid_tree_id);
-        let (lowest_ask) = IStorageContract.get_order(storage_addr, market.lowest_ask);
+        let (lowest_ask_id) = IStorageContract.get_order(storage_addr, market.lowest_ask_id);
 
         if (market.market_id == 0) {
             with_attr error_message("Market does not exist") {
@@ -180,10 +180,10 @@ namespace Markets {
         }
 
         // If ask exists and price greater than lowest ask, place market buy
-        if (lowest_ask.limit_id == 0) {
+        if (lowest_ask_id.limit_id == 0) {
             handle_revoked_refs();
         } else {        
-            let is_market_order = is_le(lowest_ask.price, price);
+            let is_market_order = is_le(lowest_ask_id.price, price);
             handle_revoked_refs();
             if (is_market_order == 1) {
                 if (post_only == 0) {
@@ -248,15 +248,15 @@ namespace Markets {
         let (datetime) = get_block_timestamp();
         let (new_order) = Orders.push(1, price, quote_amount, datetime, caller, limit.limit_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, limit.limit_id);
-        Limits.update(limit.limit_id, limit.total_vol + quote_amount, limit.length + 1);
+        Limits.update(limit.limit_id, limit.amount + quote_amount, limit.length + 1);
 
-        let (highest_bid) = IStorageContract.get_order(storage_addr, market.highest_bid);
-        let highest_bid_exists = is_le(1, highest_bid.order_id); 
-        let is_not_highest_bid = is_le(price, highest_bid.price);
-        if (is_not_highest_bid + highest_bid_exists == 2) {
+        let (highest_bid_id) = IStorageContract.get_order(storage_addr, market.highest_bid_id);
+        let highest_bid_id_exists = is_le(1, highest_bid_id.order_id); 
+        let is_not_highest_bid_id = is_le(price, highest_bid_id.price);
+        if (is_not_highest_bid_id + highest_bid_id_exists == 2) {
             handle_revoked_refs();
         } else {
-            update_inside_quote(market.market_id, market.lowest_ask, new_order.order_id);
+            update_inside_quote(market.market_id, market.lowest_ask_id, new_order.order_id);
             handle_revoked_refs();
         }
 
@@ -284,7 +284,7 @@ namespace Markets {
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
         let (limit, _) = Limits.find(price, market.ask_tree_id);
-        let (highest_bid) = IStorageContract.get_order(storage_addr, market.highest_bid);
+        let (highest_bid_id) = IStorageContract.get_order(storage_addr, market.highest_bid_id);
 
         if (market.market_id == 0) {
             with_attr error_message("Market does not exist") {
@@ -294,11 +294,11 @@ namespace Markets {
         }
 
         // If bid exists and price lower than highest bid, place market sell
-        if (highest_bid.order_id == 0) {
+        if (highest_bid_id.order_id == 0) {
             handle_revoked_refs();
         } else {
             handle_revoked_refs();
-            let is_market_order = is_le(price, highest_bid.price);
+            let is_market_order = is_le(price, highest_bid_id.price);
             if (is_market_order == 1) {
                 if (post_only == 0) {
                     sell(caller, market.market_id, price, 0, quote_amount);
@@ -358,15 +358,15 @@ namespace Markets {
         let (datetime) = get_block_timestamp();
         let (new_order) = Orders.push(0, price, quote_amount, datetime, caller, limit.limit_id);
         let (new_head_id) = IStorageContract.get_head(storage_addr, limit.limit_id);
-        Limits.update(limit.limit_id, limit.total_vol + quote_amount, limit.length + 1);
+        Limits.update(limit.limit_id, limit.amount + quote_amount, limit.length + 1);
 
-        let (lowest_ask) = IStorageContract.get_order(storage_addr, market.lowest_ask);
-        let lowest_ask_exists = is_le(1, lowest_ask.order_id); 
-        let is_not_lowest_ask = is_le(lowest_ask.price, price);
-        if (lowest_ask_exists + is_not_lowest_ask == 2) {
+        let (lowest_ask_id) = IStorageContract.get_order(storage_addr, market.lowest_ask_id);
+        let lowest_ask_id_exists = is_le(1, lowest_ask_id.order_id); 
+        let is_not_lowest_ask_id = is_le(lowest_ask_id.price, price);
+        if (lowest_ask_id_exists + is_not_lowest_ask_id == 2) {
             handle_revoked_refs();        
         } else {
-            update_inside_quote(market.market_id, new_order.order_id, market.highest_bid);
+            update_inside_quote(market.market_id, new_order.order_id, market.highest_bid_id);
             handle_revoked_refs();
         }
         Balances.transfer_to_order(caller, market.quote_asset, quote_amount);
@@ -392,16 +392,16 @@ namespace Markets {
 
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
-        let lowest_ask_exists = is_le(1, market.lowest_ask);
+        let lowest_ask_id_exists = is_le(1, market.lowest_ask_id);
         with_attr error_message("[Markets] buy > Lowest ask does not exist") {
-            assert lowest_ask_exists = 1;
+            assert lowest_ask_id_exists = 1;
         }
         
-        let (lowest_ask) = IStorageContract.get_order(storage_addr, market.lowest_ask);
+        let (lowest_ask_id) = IStorageContract.get_order(storage_addr, market.lowest_ask_id);
         let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
         let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
-        let (base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask.price, denominator);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * lowest_ask_id.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.base_asset, 1);
         
         let is_sufficient = is_le(base_amount, account_balance);
@@ -416,7 +416,7 @@ namespace Markets {
             handle_revoked_refs();
         }
 
-        let is_below_max_price = is_le(lowest_ask.price, max_price);
+        let is_below_max_price = is_le(lowest_ask_id.price, max_price);
         if (is_below_max_price == 0) {
             create_bid(caller, market_id, max_price, quote_amount, 0);
             handle_revoked_refs();
@@ -426,38 +426,38 @@ namespace Markets {
         }
         
         let (datetime) = get_block_timestamp();
-        let is_partial_fill = is_le(quote_amount, lowest_ask.amount - lowest_ask.filled - 1);
-        let (limit) = IStorageContract.get_limit(storage_addr, lowest_ask.limit_id);
+        let is_partial_fill = is_le(quote_amount, lowest_ask_id.amount - lowest_ask_id.filled - 1);
+        let (limit) = IStorageContract.get_limit(storage_addr, lowest_ask_id.limit_id);
 
         if (is_partial_fill == 1) {
             // Partial fill of order
-            Orders.set_filled(lowest_ask.order_id, lowest_ask.filled + quote_amount);
-            Balances.transfer_from_order(lowest_ask.owner, market.quote_asset, quote_amount);
-            Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, base_amount);
-            Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, quote_amount);
-            Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
+            Orders.set_filled(.order_id, lowest_ask_id.filled + quote_amount);
+            Balances.transfer_from_order(lowest_ask_id.owner, market.quote_asset, quote_amount);
+            Balances.transfer_balance(caller, lowest_ask_id.owner, market.base_asset, base_amount);
+            Balances.transfer_balance(lowest_ask_id.owner, caller, market.quote_asset, quote_amount);
+            Limits.update(limit.limit_id, limit.amount - quote_amount, limit.length);                
             
-            log_offer_taken.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, lowest_ask.owner, caller, market.base_asset, market.quote_asset, lowest_ask.price, quote_amount, lowest_ask.filled+quote_amount);
-            log_buy_filled.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask.owner, market.base_asset, market.quote_asset, lowest_ask.price, quote_amount, filled+quote_amount);
+            log_offer_taken.emit(lowest_ask_id.order_id, limit.limit_id, market.market_id, datetime, lowest_ask_id.owner, caller, market.base_asset, market.quote_asset, lowest_ask_id.price, quote_amount, lowest_ask_id.filled+quote_amount);
+            log_buy_filled.emit(lowest_ask_id.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask_id.owner, market.base_asset, market.quote_asset, lowest_ask_id.price, quote_amount, filled+quote_amount);
             handle_revoked_refs();
             return ();
         } else {
             // Fill entire order
-            delete(lowest_ask.order_id);
+            delete(lowest_ask_id.order_id);
             let (price_units) = pow(10, 18);
-            let (updated_base_amount, _) = unsigned_div_rem((lowest_ask.amount - lowest_ask.filled) * lowest_ask.price, price_units);
-            Balances.transfer_balance(caller, lowest_ask.owner, market.base_asset, updated_base_amount);
-            Balances.transfer_balance(lowest_ask.owner, caller, market.quote_asset, lowest_ask.amount - lowest_ask.filled);
-            Orders.set_filled(lowest_ask.order_id, lowest_ask.amount);
+            let (updated_base_amount, _) = unsigned_div_rem((lowest_ask_id.amount - lowest_ask_id.filled) * lowest_ask_id.price, price_units);
+            Balances.transfer_balance(caller, lowest_ask_id.owner, market.base_asset, updated_base_amount);
+            Balances.transfer_balance(lowest_ask_id.owner, caller, market.quote_asset, lowest_ask_id.amount - lowest_ask_id.filled);
+            Orders.set_filled(lowest_ask_id.order_id, lowest_ask_id.amount);
 
-            log_offer_taken.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, lowest_ask.owner, caller, market.base_asset, market.quote_asset, lowest_ask.price, lowest_ask.amount, lowest_ask.amount);
-            log_buy_filled.emit(lowest_ask.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask.owner, market.base_asset, market.quote_asset, lowest_ask.price, lowest_ask.amount-lowest_ask.filled, filled+lowest_ask.amount-lowest_ask.filled);
+            log_offer_taken.emit(lowest_ask_id.order_id, limit.limit_id, market.market_id, datetime, lowest_ask_id.owner, caller, market.base_asset, market.quote_asset, lowest_ask_id.price, lowest_ask_id.amount, lowest_ask_id.amount);
+            log_buy_filled.emit(lowest_ask_id.order_id, limit.limit_id, market.market_id, datetime, caller, lowest_ask_id.owner, market.base_asset, market.quote_asset, lowest_ask_id.price, lowest_ask_id.amount-lowest_ask_id.filled, filled+lowest_ask_id.amount-lowest_ask_id.filled);
 
-            if (quote_amount - lowest_ask.amount + lowest_ask.filled == 0) {
+            if (quote_amount - lowest_ask_id.amount + lowest_ask_id.filled == 0) {
                 handle_revoked_refs();
             } else {
                 handle_revoked_refs();
-                buy(caller, market_id, max_price, filled + lowest_ask.amount - lowest_ask.filled, quote_amount - lowest_ask.amount + lowest_ask.filled);
+                buy(caller, market_id, max_price, filled + lowest_ask_id.amount - lowest_ask_id.filled, quote_amount - lowest_ask_id.amount + lowest_ask_id.filled);
             }
 
             handle_revoked_refs();
@@ -478,16 +478,16 @@ namespace Markets {
 
         let (storage_addr) = Orders.get_storage_address();
         let (market) = IStorageContract.get_market(storage_addr, market_id);
-        let highest_bid_exists = is_le(1, market.highest_bid);
+        let highest_bid_id_exists = is_le(1, market.highest_bid_id);
         with_attr error_message("[Markets] sell > Highest bid does not exist") {
-            assert highest_bid_exists = 1;
+            assert highest_bid_id_exists = 1;
         }
 
-        let (highest_bid) = IStorageContract.get_order(storage_addr, market.highest_bid);
+        let (highest_bid_id) = IStorageContract.get_order(storage_addr, market.highest_bid_id);
         let (quote_decimals) = IStorageContract.get_quote_decimals(storage_addr, market.market_id);
         let (base_decimals) = IStorageContract.get_base_decimals(storage_addr, market.market_id);
         let (denominator) = pow(10, 18 + quote_decimals - base_decimals);
-        let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid.price, denominator);
+        let (base_amount, _) = unsigned_div_rem(quote_amount * highest_bid_id.price, denominator);
         let (account_balance) = Balances.get_balance(caller, market.quote_asset, 1);
 
         let is_sufficient = is_le(quote_amount, account_balance);
@@ -502,7 +502,7 @@ namespace Markets {
             handle_revoked_refs();
         }
 
-        let is_above_min_price = is_le(min_price, highest_bid.price);
+        let is_above_min_price = is_le(min_price, highest_bid_id.price);
         if (is_above_min_price == 0) {
             create_ask(caller, market_id, min_price, quote_amount, 0);
             handle_revoked_refs();
@@ -512,38 +512,38 @@ namespace Markets {
         }
         
         let (datetime) = get_block_timestamp();
-        let is_partial_fill = is_le(quote_amount, highest_bid.amount - highest_bid.filled - 1);
-        let (limit) = IStorageContract.get_limit(storage_addr, highest_bid.limit_id);
+        let is_partial_fill = is_le(quote_amount, highest_bid_id.amount - highest_bid_id.filled - 1);
+        let (limit) = IStorageContract.get_limit(storage_addr, highest_bid_id.limit_id);
         if (is_partial_fill == 1) {
             // Partial fill of order
-            Orders.set_filled(highest_bid.order_id, highest_bid.filled + quote_amount);
-            Balances.transfer_from_order(highest_bid.owner, market.base_asset, base_amount);
-            Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, quote_amount);
-            Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, base_amount);
-            Limits.update(limit.limit_id, limit.total_vol - quote_amount, limit.length);                
+            Orders.set_filled(highest_bid_id.order_id, highest_bid_id.filled + quote_amount);
+            Balances.transfer_from_order(highest_bid_id.owner, market.base_asset, base_amount);
+            Balances.transfer_balance(caller, highest_bid_id.owner, market.quote_asset, quote_amount);
+            Balances.transfer_balance(highest_bid_id.owner, caller, market.base_asset, base_amount);
+            Limits.update(limit.limit_id, limit.amount - quote_amount, limit.length);                
 
-            log_bid_taken.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, highest_bid.owner, caller, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount, highest_bid.filled+quote_amount);
-            log_sell_filled.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.price, quote_amount, filled+quote_amount);
+            log_bid_taken.emit(highest_bid_id.order_id, limit.limit_id, market.market_id, datetime, highest_bid_id.owner, caller, market.base_asset, market.quote_asset, highest_bid_id.price, highest_bid_id.amount, highest_bid_id.filled+quote_amount);
+            log_sell_filled.emit(highest_bid_id.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid_id.owner, market.base_asset, market.quote_asset, highest_bid_id.price, quote_amount, filled+quote_amount);
             handle_revoked_refs();
 
             return ();
         } else {
             // Fill entire order
-            delete(highest_bid.order_id);
-            Balances.transfer_balance(caller, highest_bid.owner, market.quote_asset, highest_bid.amount - highest_bid.filled);
+            delete(highest_bid_id.order_id);
+            Balances.transfer_balance(caller, highest_bid_id.owner, market.quote_asset, highest_bid_id.amount - highest_bid_id.filled);
             let (price_units) = pow(10, 18);
-            let (updated_base_amount, _) = unsigned_div_rem((highest_bid.amount - highest_bid.filled) * highest_bid.price, price_units);
-            Balances.transfer_balance(highest_bid.owner, caller, market.base_asset, updated_base_amount);
-            Orders.set_filled(highest_bid.order_id, highest_bid.amount);
+            let (updated_base_amount, _) = unsigned_div_rem((highest_bid_id.amount - highest_bid_id.filled) * highest_bid_id.price, price_units);
+            Balances.transfer_balance(highest_bid_id.owner, caller, market.base_asset, updated_base_amount);
+            Orders.set_filled(highest_bid_id.order_id, highest_bid_id.amount);
 
-            log_bid_taken.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, highest_bid.owner, caller, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount, highest_bid.amount);
-            log_sell_filled.emit(highest_bid.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid.owner, market.base_asset, market.quote_asset, highest_bid.price, highest_bid.amount-highest_bid.filled, filled+highest_bid.amount-highest_bid.filled);
+            log_bid_taken.emit(highest_bid_id.order_id, limit.limit_id, market.market_id, datetime, highest_bid_id.owner, caller, market.base_asset, market.quote_asset, highest_bid_id.price, highest_bid_id.amount, highest_bid_id.amount);
+            log_sell_filled.emit(highest_bid_id.order_id, limit.limit_id, market.market_id, datetime, caller, highest_bid_id.owner, market.base_asset, market.quote_asset, highest_bid_id.price, highest_bid_id.amount-highest_bid_id.filled, filled+highest_bid_id.amount-highest_bid_id.filled);
             
-            if (quote_amount - highest_bid.amount + highest_bid.filled == 0) {
+            if (quote_amount - highest_bid_id.amount + highest_bid_id.filled == 0) {
                 handle_revoked_refs();
             } else {
                 handle_revoked_refs();
-                sell(caller, market_id, min_price, filled + highest_bid.amount - highest_bid.filled, quote_amount - highest_bid.amount + highest_bid.filled); 
+                sell(caller, market_id, min_price, filled + highest_bid_id.amount - highest_bid_id.filled, quote_amount - highest_bid_id.amount + highest_bid_id.filled); 
             }
 
             handle_revoked_refs();
@@ -577,16 +577,16 @@ namespace Markets {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_max(limit.tree_id);
                 if (next_limit.limit_id == 0) {
-                    update_inside_quote(market.market_id, market.lowest_ask, 0);
+                    update_inside_quote(market.market_id, market.lowest_ask_id, 0);
                     handle_revoked_refs();
                 } else {
                     let (next_head_id) = IStorageContract.get_head(storage_addr, next_limit.limit_id);
-                    update_inside_quote(market.market_id, market.lowest_ask, next_head_id);
+                    update_inside_quote(market.market_id, market.lowest_ask_id, next_head_id);
                     handle_revoked_refs();
                 }
             } else {
-                Limits.update(limit.limit_id, limit.total_vol - order.amount + order.filled, limit.length - 1);
-                update_inside_quote(market.market_id, market.lowest_ask, new_head_id);
+                Limits.update(limit.limit_id, limit.amount - order.amount + order.filled, limit.length - 1);
+                update_inside_quote(market.market_id, market.lowest_ask_id, new_head_id);
                 handle_revoked_refs();     
             }
             let (order_base_balance, _) = unsigned_div_rem((order.amount - order.filled) * order.price, denominator);
@@ -597,16 +597,16 @@ namespace Markets {
                 Limits.delete(limit.price, limit.tree_id, limit.market_id);
                 let (next_limit) = Limits.get_min(limit.tree_id);
                 if (next_limit.limit_id == 0) {
-                    update_inside_quote(market.market_id, 0, market.highest_bid);
+                    update_inside_quote(market.market_id, 0, market.highest_bid_id);
                     handle_revoked_refs();
                 } else {
                     let (next_head_id) = IStorageContract.get_head(storage_addr, next_limit.limit_id);
-                    update_inside_quote(market.market_id, next_head_id, market.highest_bid);
+                    update_inside_quote(market.market_id, next_head_id, market.highest_bid_id);
                     handle_revoked_refs();
                 }
             } else {
-                Limits.update(limit.limit_id, limit.total_vol - order.amount + order.filled, limit.length - 1);
-                update_inside_quote(market.market_id, new_head_id, market.highest_bid);
+                Limits.update(limit.limit_id, limit.amount - order.amount + order.filled, limit.length - 1);
+                update_inside_quote(market.market_id, new_head_id, market.highest_bid_id);
                 handle_revoked_refs();    
             }
             Balances.transfer_from_order(order.owner, market.quote_asset, order.amount - order.filled);

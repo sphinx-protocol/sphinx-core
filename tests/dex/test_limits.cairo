@@ -22,7 +22,7 @@ namespace ILimitsContract {
     func get_max(tree_id : felt) -> (max : Limit) {
     }
     // Setter function to update details of limit price
-    func update(limit_id : felt, total_vol : felt, length : felt) {
+    func update(limit_id : felt, amount : felt, length : felt) {
     }
     // View limit tree.
     func view_limit_tree(tree_id : felt) -> (prices_len : felt, prices : felt*, amounts_len : felt, amounts : felt*) {
@@ -101,7 +101,7 @@ func test_limits{
     // Test 5 : Should update limit price
     ILimitsContract.update(limits_addr, 1, 1000, 5);
     let (limit_1) = IStorageContract.get_limit(storage_addr, 1);
-    assert limit_1.total_vol = 1000;
+    assert limit_1.amount = 1000;
     assert limit_1.length = 5;
 
     // Test 6 : view_limit_tree should fetch limit tree properly

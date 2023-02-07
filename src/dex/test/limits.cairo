@@ -60,9 +60,9 @@ func get_max{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (t
 
 @external
 func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-    limit_id : felt, total_vol : felt, length : felt
+    limit_id : felt, amount : felt, length : felt
 ) {
-    Limits.update(limit_id, total_vol, length);
+    Limits.update(limit_id, amount, length);
     return ();
 }
 

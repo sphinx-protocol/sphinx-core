@@ -59,7 +59,7 @@ namespace Limits {
 
         let (id) = IStorageContract.get_curr_limit_id(storage_addr);
         tempvar new_limit: Limit* = new Limit(
-            limit_id=id, left_id=0, right_id=0, price=price, total_vol=0, length=0, tree_id=tree_id, market_id=market_id
+            limit_id=id, left_id=0, right_id=0, price=price, amount=0, length=0, tree_id=tree_id, market_id=market_id
         );
         IStorageContract.set_limit(storage_addr, id, [new_limit]);
         IStorageContract.set_curr_limit_id(storage_addr, id + 1);
@@ -106,7 +106,7 @@ namespace Limits {
             if (curr.right_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
                     limit_id=curr.limit_id, left_id=curr.left_id, right_id=new_limit_id, price=curr.price, 
-                    total_vol=curr.total_vol, length=curr.length, tree_id=tree_id, market_id=curr.market_id
+                    amount=curr.amount, length=curr.length, tree_id=tree_id, market_id=curr.market_id
                 );
                 IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
@@ -125,7 +125,7 @@ namespace Limits {
             if (curr.left_id == 0) {
                 tempvar new_curr: Limit* = new Limit(
                     limit_id=curr.limit_id, left_id=new_limit_id, right_id=curr.right_id, price=curr.price,  
-                    total_vol=curr.total_vol, length=curr.length, tree_id=tree_id, market_id=curr.market_id
+                    amount=curr.amount, length=curr.length, tree_id=tree_id, market_id=curr.market_id
                 );
                 IStorageContract.set_limit(storage_addr, curr.limit_id, [new_curr]);
                 handle_revoked_refs();
@@ -304,7 +304,7 @@ namespace Limits {
     // @param limit : ID of limit price to update
     // @param new_vol : new volume
     func update{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
-        limit_id : felt, total_vol : felt, length : felt
+        limit_id : felt, amount : felt, length : felt
     ) {
         if (limit_id == 0) {
             with_attr error_message("Limit does not exist") {
@@ -316,7 +316,7 @@ namespace Limits {
         let (limit) = IStorageContract.get_limit(storage_addr, limit_id);
         tempvar new_limit: Limit* = new Limit(
             limit_id=limit.limit_id, left_id=limit.left_id, right_id=limit.right_id, price=limit.price, 
-            total_vol=total_vol, length=length, tree_id=limit.tree_id, market_id=limit.market_id
+            amount=amount, length=length, tree_id=limit.tree_id, market_id=limit.market_id
         );
         IStorageContract.set_limit(storage_addr, limit_id, [new_limit]);
         return ();
@@ -357,7 +357,7 @@ namespace Limits {
         node : Limit, left_id : felt, right_id : felt
     ) {
         tempvar new_node: Limit* = new Limit(
-            limit_id=node.limit_id, left_id=left_id, right_id=right_id, price=node.price, total_vol=node.total_vol, 
+            limit_id=node.limit_id, left_id=left_id, right_id=right_id, price=node.price, amount=node.amount, 
             length=node.length, tree_id=node.tree_id, market_id=node.market_id
         );
         let (storage_addr) = Orders.get_storage_address();
@@ -397,7 +397,7 @@ namespace Limits {
     // Helper function to generate an empty limit struct.
     func gen_empty_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} () -> (empty_limit : Limit*) {
         tempvar empty_limit: Limit* = new Limit(
-            limit_id=0, left_id=0, right_id=0, price=0, total_vol=0, length=0, tree_id=0, market_id=0
+            limit_id=0, left_id=0, right_id=0, price=0, amount=0, length=0, tree_id=0, market_id=0
         );
         return (empty_limit=empty_limit);
     }
@@ -440,7 +440,7 @@ namespace Limits {
         let (new_idx) = traverse_left_branch(node=node, idx=idx);
         
         let (new_idx_2) = array_append{array=prices}(val=node.price, idx=new_idx);
-        array_append{array=amounts}(val=node.total_vol, idx=new_idx);
+        array_append{array=amounts}(val=node.amount, idx=new_idx);
 
         let (new_idx_3) = traverse_right_branch(node=node, idx=new_idx_2);
 
