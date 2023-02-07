@@ -5,11 +5,8 @@ struct Order {
     order_id : felt,
     next_id : felt,
     is_bid : felt, // 1 = bid, 0 = ask
-    price : felt,
     amount : felt,
-    filled : felt,
-    datetime : felt,
-    owner : felt,
+    owner_id : felt,
     limit_id : felt,
 }
 
@@ -19,8 +16,11 @@ struct Limit {
     left_id : felt,
     right_id : felt,
     price : felt,
-    total_vol : felt,
+    amount : felt,
+    filled : felt,
     length : felt,
+    is_bid : felt,
+    head_id : felt,
     tree_id : felt,
     market_id : felt,
 }
@@ -30,11 +30,19 @@ struct Market {
     market_id : felt,
     bid_tree_id : felt,
     ask_tree_id : felt,
-    lowest_ask : felt,
-    highest_bid : felt,
-    base_asset : felt,
-    quote_asset : felt,
-} 
+    lowest_ask_id : felt,
+    highest_bid_id : felt,
+    base_asset_id : felt,
+    quote_asset_id : felt,
+}
+
+// Data structure representing an asset.
+struct Asset {
+    asset_id : felt,
+    symbol : felt,
+    decimals : felt,
+    address : felt,
+}
 
 // Bitpacked Order struct.
 // -----------------------------
@@ -45,7 +53,7 @@ struct Market {
 //        |  next_id   |      40
 //        |  limit_id  |      40
 // -----------------------------
-// slab1  |  amount    |       8
+// slab1  |  amount    |      88
 //        |  user_id   |      40
 // -----------------------------
 struct PackedOrder {
@@ -70,7 +78,7 @@ struct PackedOrder {
 //        |  is_bid     |       1
 //        |  head_id    |      40
 //        |  tail_id    |      40
-//        |  market_id  |      16
+//        |  market_id  |      20
 // ------------------------------
 struct PackedLimit {
     slab0 : felt,
@@ -83,16 +91,31 @@ struct PackedLimit {
 // ----------------------------------
 // slab   |  variable       |  bit(s)
 // ----------------------------------
-// slab0  |  market_id      |      40
+// slab0  |  market_id      |      20
 //        |  bid_tree_id    |      40
 //        |  ask_tree_id    |      40
 // ----------------------------------
-// slab1  |  lowest_ask     |      40
-//        |  highest_bid    |      40
+// slab1  |  lowest_ask_id     |      40
+//        |  highest_bid_id    |      40
 //        |  base_asset_id  |      20
-//        |  highest_bid    |      20
+//        |  highest_bid_id    |      20
 // ----------------------------------
 struct PackedMarket {
+    slab0 : felt,
+    slab1 : felt,
+}
+
+// Bitpacked Asset struct.
+// -------------------------------
+// slab   |  variable    |  bit(s)
+// -------------------------------
+// slab0  |  asset_id    |      20
+//        |  decimals    |       6
+//        |  symbol      |      40
+// -------------------------------
+// slab1  |  address     |     252
+// -------------------------------
+struct PackedAsset {
     slab0 : felt,
     slab1 : felt,
 }

@@ -3,7 +3,9 @@
 from starkware.cairo.common.cairo_builtins import HashBuiltin
 from starkware.starknet.common.syscalls import get_caller_address
 from lib.openzeppelin.access.ownable.library import Ownable
-from src.dex.structs import Order, Limit, Market
+
+from src.dex.structs import Order, Limit, Market, PackedOrder, PackedLimit, PackedMarket
+from src.dex.bitpacking import pack_order, unpack_order, pack_limit, unpack_limit, pack_market, unpack_market, unpack_slab_in_range, update_slab_in_range
 from src.utils.handle_revoked_refs import handle_revoked_refs
 
 //
@@ -19,73 +21,56 @@ func l2_gateway_contract_address() -> (addr : felt) {
 func owner() -> (addr : felt) {
 }
 
-// Stores orders in doubly linked lists.
+// Stores packed orders composed as singly linked lists.
 @storage_var
-func orders(order_id : felt) -> (order : Order) {
-}
-// Stores heads of doubly linked lists.
-@storage_var
-func heads(limit_id : felt) -> (order_id : felt) {
-}
-// Stores tails of doubly linked lists.
-@storage_var
-func tails(limit_id : felt) -> (order_id : felt) {
-}
-// Stores lengths of doubly linked lists.
-@storage_var
-func lengths(limit_id : felt) -> (len : felt) {
-}
+func orders(order_id : felt) -> (packed_order : PackedOrder) {
+
 // Stores latest order id.
 @storage_var
 func curr_order_id() -> (order_id : felt) {
 }
 
-// Stores details of limit prices as mapping.
+// Stores packed limit prices composed as binary search trees.
 @storage_var
-func limits(limit_id : felt) -> (limit : Limit) {
-}
-// Stores roots of binary search trees.
-@storage_var
-func roots(tree_id : felt) -> (limit_id : felt) {
+func limits(limit_id : felt) -> (packed_limit : PackedLimit) {
 }
 // Stores latest limit id.
 @storage_var
 func curr_limit_id() -> (id : felt) {
 }
 
-// Stores active markets.
+// Stores roots of binary search trees.
 @storage_var
-func markets(market_id : felt) -> (market : Market) {
-}
-// Stores on-chain mapping of asset addresses to market id.
-@storage_var
-func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
-}
-// Stores latest market id.
-@storage_var
-func curr_market_id() -> (market_id : felt) {
+func roots(tree_id : felt) -> (limit_id : felt) {
 }
 // Stores latest tree id.
 @storage_var
 func curr_tree_id() -> (tree_id : felt) {
 }
-// Stores decimals of base asset for each market.
+
+// Stores packed market struct.
 @storage_var
-func base_decimals(market_id : felt) -> (decimals : felt) {
+func markets(market_id : felt) -> (packed_market : PackedMarket) {
 }
-// Stores decimals of quote asset for each market.
+// Stores latest market id.
 @storage_var
-func quote_decimals(market_id : felt) -> (decimals : felt) {
+func curr_market_id() -> (market_id : felt) {
+}
+// Stores on-chain mapping of asset addresses to market id.
+@storage_var
+func market_ids(base_asset : felt, quote_asset : felt) -> (market_id : felt) {
 }
 
-// Stores user balances.
+// Stores user balances available in account and locked in open orders.
 @storage_var
-func account_balances(user : felt, asset : felt) -> (amount : felt) {
+func balances(user_asset : felt) -> (packed_balances : felt) {
 }
-// Stores user balances locked in open orders.
+
+// Stores packed asset struct.
 @storage_var
-func order_balances(user : felt, asset : felt) -> (amount : felt) {
+func assets(asset_id : felt) -> (packed_asset : PackedAsset) {
 }
+
 
 //
 // Constructor
@@ -145,7 +130,8 @@ func assert_only_gateway{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_c
 func get_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     order_id : felt) -> (order : Order
 ) {
-    let (order) = orders.read(order_id);
+    let (packed_order) = orders.read(order_id);
+    let (order) = unpack_order(packed_order);
     return (order=order);
 }
 
@@ -154,7 +140,8 @@ func set_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
     order_id : felt, new_order : Order
 ) {
     assert_only_gateway();
-    orders.write(order_id, new_order);
+    let (new_packed_order) = pack_order(new_order);
+    orders.write(order_id, new_packed_order);
     return ();
 }
 
@@ -162,8 +149,9 @@ func set_order{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
 func get_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (order_id : felt
 ) {
-    let (order_id) = heads.read(limit_id);
-    return (order_id=order_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (head_order_id) = unpack_slab_in_range(packed_limit.slab3, 18, 40, 11);
+    return (order_id=head_order_id);
 }
 
 @external
@@ -171,7 +159,10 @@ func set_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt, new_order_id : felt
 ) {
     assert_only_gateway();
-    heads.write(limit_id, new_order_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (updated_slab3) = update_slab_in_range(packed_limit.slab3, 18, 40, 11, new_order_id);
+    local updated_limit : PackedLimit = PackedLimit(packed_limit.slab0, packed_limit.slab1, packed_limit.slab2, updated_slab3);
+    limits.write(limit_id, updated_limit);
     return ();
 }
 
@@ -179,8 +170,9 @@ func set_head{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func get_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (order_id : felt
 ) {
-    let (order_id) = tails.read(limit_id);
-    return (order_id=order_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (tail_order_id) = unpack_slab_in_range(packed_limit.slab3, 58, 40, 11);
+    return (order_id=tail_order_id);
 }
 
 @external
@@ -188,7 +180,10 @@ func set_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt, new_order_id : felt
 ) {
     assert_only_gateway();
-    tails.write(limit_id, new_order_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (updated_slab3) = update_slab_in_range(packed_limit.slab3, 58, 40, 11, new_order_id);
+    local updated_limit : PackedLimit = PackedLimit(packed_limit.slab0, packed_limit.slab1, packed_limit.slab2, updated_slab3);
+    limits.write(limit_id, updated_limit);
     return ();
 }
 
@@ -196,7 +191,8 @@ func set_tail{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
 func get_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (len : felt
 ) {
-    let (len) = lengths.read(limit_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (len) = unpack_slab_in_range(packed_limit.slab3, 1, 16, 11);
     return (len=len);
 }
 
@@ -205,7 +201,10 @@ func set_length{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     limit_id : felt, new_len : felt
 ) {
     assert_only_gateway();
-    lengths.write(limit_id, new_len);
+    let (packed_limit) = limits.read(limit_id);
+    let (updated_slab3) = update_slab_in_range(packed_limit.slab3, 1, 16, 11, new_len);
+    local updated_limit : PackedLimit = PackedLimit(packed_limit.slab0, packed_limit.slab1, packed_limit.slab2, updated_slab3);
+    limits.write(limit_id, updated_limit);
     return ();
 }
 
@@ -229,7 +228,8 @@ func set_curr_order_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     limit_id : felt) -> (limit : Limit
 ) {
-    let (limit) = limits.read(limit_id);
+    let (packed_limit) = limits.read(limit_id);
+    let (limit) = unpack_limit(packed_limit);
     return (limit=limit);
 }
 
@@ -238,7 +238,8 @@ func set_limit{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} 
     limit_id : felt, new_limit : Limit
 ) {
     assert_only_gateway();
-    limits.write(limit_id, new_limit);
+    let (new_packed_limit) = pack_limit(new_limit);
+    limits.write(limit_id, new_packed_limit);
     return ();
 }
 
@@ -279,7 +280,8 @@ func set_curr_limit_id{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_che
 func get_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr} (
     market_id : felt) -> (market : Market
 ) {
-    let (market) = markets.read(market_id);
+    let (packed_market) = markets.read(market_id);
+    let (market) = unpack_market(packed_market);
     return (market=market);
 }
 
@@ -288,7 +290,8 @@ func set_market{syscall_ptr: felt*, pedersen_ptr: HashBuiltin*, range_check_ptr}
     market_id : felt, new_market : Market
 ) {
     assert_only_gateway();
-    markets.write(market_id, new_market);
+    let (new_packed_market) = pack_market(new_market);
+    markets.write(market_id, new_packed_market);
     return ();
 }
 
